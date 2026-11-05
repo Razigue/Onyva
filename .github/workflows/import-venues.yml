@@ -1,0 +1,38 @@
+name: Import hebdomadaire des lieux OSM
+on:
+  schedule:
+    - cron: '20 3 * * 1'
+  workflow_dispatch:
+concurrency:
+  group: import-venues
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TZ: Europe/Paris
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      OSM_VENUES_FILE: /tmp/onyva-venues.jsonl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Vérifier les accès serveur sans afficher les secrets
+        run: node -e 'if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Configure SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY avant l’import.")'
+      - run: pnpm install --frozen-lockfile
+      - run: pip install -r scripts/venues/requirements.txt
+      - name: Télécharger l’extrait régional OSM
+        run: curl --fail --location --retry 2 --max-time 600 https://download.geofabrik.de/europe/france/ile-de-france-latest.osm.pbf --output /tmp/ile-de-france.osm.pbf
+      - name: Extraire les établissements de l’extrait régional
+        run: python scripts/venues/extract.py /tmp/ile-de-france.osm.pbf > /tmp/onyva-venues.jsonl
+      - run: pnpm venues:import
