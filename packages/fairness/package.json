@@ -1,0 +1,9 @@
+{
+  "name": "@onyva/fairness",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@onyva/shared": "workspace:*"
+  }
+}
