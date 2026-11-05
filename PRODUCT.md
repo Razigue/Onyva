@@ -7,7 +7,7 @@ Onyva accompagne une sortie entre amis en Île-de-France : trouver un lieu équi
 - Problème : le lieu est choisi au hasard, quelqu’un se retrouve avec 50 minutes de trajet et le retour tardif est oublié.
 - Promesse : un lien dans le groupe, aucun compte à créer, un lieu juste pour tout le monde.
 - Public : groupes de 2 à 10 amis, pour un verre, un dîner ou un café.
-- Différence : horaires et perturbations IDFM, retour pris en compte, saisie par station et partage temporaire de la position pendant la sortie.
+- Différence : horaires IDFM et info trafic, retour pris en compte, saisie par station et partage temporaire de la position pendant la sortie. Une perturbation bloquante sur un trajet empêche de confirmer le lieu.
 
 ## Principes d’usage
 

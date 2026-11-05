@@ -60,11 +60,21 @@ Conséquence : aucune table de correspondance n’est nécessaire. Le moteur acc
 | `pathways.txt` | 5 024 cheminements, tous des couloirs (`pathway_mode=1`), uniquement entre entrées et quais, sur 761 stations. Longueur et temps de parcours toujours renseignés, médiane 83 s, maximum 675 s | Pas utile aux correspondances. Utilisable plus tard pour la marche entre la sortie de station et le lieu |
 | Correspondance sur un même quai | Aucune ligne `from_stop_id = to_stop_id` | Proposition : autoriser un changement sur le même quai avec un temps minimal configurable, 60 s par défaut, **à vérifier** contre des itinéraires de référence |
 
-### Écarts avec PRIM à connaître
+### Décisions validées le 6 novembre 2026
 
-- **Horaires théoriques seulement.** Le GTFS ne contient ni temps réel ni perturbations du jour. Les travaux planifiés présents dans le flux au moment de la compilation sont pris en compte. `PRODUCT.md` présentait les perturbations IDFM comme une différence du produit : ce point doit être reformulé.
-- **Horizon d’environ 30 jours.** Une sortie au-delà de la fin du flux ne peut pas être calculée. Le moteur refusera ces dates avec un message clair. Décision produit à prendre : limiter la date de création, ou prévenir l’organisateur.
-- **Marche finale estimée.** Sans graphe piéton, la marche de la station au lieu reste une estimation, comme aujourd’hui dans PostGIS.
+1. **Perturbations.** Le GTFS ne contient que les horaires théoriques, travaux planifiés inclus au moment de la compilation. Les perturbations viennent de l’API PRIM `disruptions_bulk/disruptions/v2`, testée avec la clé réelle (voir plus bas). Règles appliquées à chaque portion de trajet dont la période recouvre une perturbation sur la ligne ou le tronçon utilisé :
+   - `BLOQUANTE` : trajet non vérifié, lieu non confirmable ;
+   - `PERTURBEE` : lieu confirmable, avertissement visible ;
+   - `INFORMATION` : message simple, sans effet sur le choix.
+   Si l’API est indisponible, les trajets restent calculés sur l’offre théorique avec le message « Info trafic indisponible, vérifie avant de partir ». Récupération partagée, au plus une fois toutes les 10 minutes et seulement quand un calcul en a besoin, soit 144 appels par jour au maximum. Données de référence, non liées à une sortie, sans donnée personnelle. Cette API reste utilisée après le retrait du calculateur PRIM.
+2. **Horizon.** La date d’une sortie est limitée à la période de validité du flux, avec un message clair à la création. Le moteur refuse toute date hors période.
+3. **Transport à la demande.** Les passages sur réservation (`pickup_type=2`, `drop_off_type=2` ou fenêtres de réservation) sont exclus du calcul. Quand aucun trajet n’existe sans eux, l’application l’explique au lieu d’afficher seulement « aucun trajet ».
+
+La marche finale de la station au lieu reste une estimation tant qu’aucun graphe piéton n’est branché, comme aujourd’hui dans PostGIS.
+
+### API des perturbations, mesure du 5 novembre 2026
+
+Trois appels réels, chacun réservé dans le compteur PRIM partagé. `GET /marketplace/disruptions_bulk/disruptions/v2` répond 200 en 182 ms, 1 338 999 octets : 864 perturbations, 734 lignes touchées, champ `lastUpdatedDate`. Les 734 identifiants de lignes (`line:IDFM:<id>`) correspondent aux `route_id` du GTFS en retirant `line:`. Les tronçons (`impactedSections`) utilisent les identifiants de stations du catalogue. Répartition observée : causes 510 travaux, 302 perturbations, 52 informations ; gravités 385 `PERTURBEE`, 383 `BLOQUANTE`, 96 `INFORMATION`. Périodes au format `AAAAMMJJTHHMMSS`, fuseau **à vérifier** (Paris supposé). `GET /marketplace/v2/navitia/line_reports` répond aussi (200, 136 ms) mais ne renvoyait aucune perturbation à cet instant. Ces mesures ponctuelles ne sont ni une médiane ni un p95.
 
 ## Contrat proposé pour le service moteur
 
@@ -94,7 +104,9 @@ Sémantique :
 - `arriveBy` : itinéraire qui part le plus tard possible en arrivant à `to` au plus tard à `time`. À égalité, le moins de correspondances.
 - `departAfter` : itinéraire qui arrive le plus tôt possible en partant de `from` à partir de `time`. À égalité, le moins de correspondances. Sert aux retours après la fin de soirée.
 
-Sortie par élément : `{ key, status: 'ok', journey }`, avec `journey` conforme au type `Journey` de `packages/shared` (sections marche, attente, trajet, ligne, noms d’arrêts, nuit), ou `{ key, status: 'none', reason: 'no-service' | 'too-long' }`. Un retour `none` exclut le lieu, comme aujourd’hui.
+Sortie par élément : `{ key, status: 'ok', journey }`, avec `journey` conforme au type `Journey` de `packages/shared` (sections marche, attente, trajet, ligne, noms d’arrêts, nuit), ou `{ key, status: 'none', reason: 'no-service' | 'too-long' | 'on-demand-only' }`. Un retour `none` exclut le lieu, comme aujourd’hui.
+
+Chaque portion en transport porte aussi l’identifiant de ligne GTFS et la liste des stations traversées, pour que Supabase applique les règles de perturbation sans que le moteur dépende de PRIM. Ajout facultatif au type `Leg`, sans changement pour l’application.
 
 La marche finale vers le lieu reste ajoutée côté Supabase à partir de l’estimation existante, pour qu’aucune position de lieu ne soit nécessaire au moteur. Interface prévue pour un graphe piéton plus tard.
 
@@ -133,5 +145,5 @@ Commandes prévues : `pnpm engine:build-network`, `pnpm engine:dev`, `pnpm engin
 
 ## État
 
-- Phase 0 : terminée, en attente de validation du contrat.
+- Phase 0 : terminée. Contrat et décisions validés le 6 novembre 2026.
 - Phases 1 à 5 : à faire. PRIM reste le fournisseur actif jusqu’à la phase 3.
