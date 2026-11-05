@@ -98,7 +98,7 @@ Les services applicatifs doivent rester dans leurs offres gratuites au démarrag
 - Apple Developer Program : frais de publication déjà prévus, 99 dollars par an.
 - Google Play : frais de publication déjà prévus, 25 dollars en une fois. L’Install Referrer nécessite une installation depuis Google Play. Un pilote Android peut utiliser un APK sans publication, avec réouverture manuelle du lien.
 
-Aucune VM Oracle et aucun service de calcul de trajets à héberger. Le moteur maison est uniquement un plan B documenté.
+Les trajets passent à un moteur maison alimenté par le GTFS IDFM, hébergé gratuitement pour le MVP (Oracle Cloud Always Free, voir `docs/engine.md`). Aucun service payant n’est activé. PRIM reste actif jusqu’au branchement du moteur.
 
 ## Avant publication
 
