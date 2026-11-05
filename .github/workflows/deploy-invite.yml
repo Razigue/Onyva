@@ -1,0 +1,38 @@
+name: Déployer les invitations sur Cloudflare Pages
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deploy-invite
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+      VITE_ANDROID_STORE_URL: ${{ vars.ANDROID_STORE_URL }}
+      VITE_IOS_STORE_URL: ${{ vars.IOS_STORE_URL }}
+      APPLE_APP_ID: ${{ vars.APPLE_APP_ID }}
+      ANDROID_CERT_FINGERPRINT: ${{ vars.ANDROID_CERT_FINGERPRINT }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Vérifier la configuration
+        run: node -e 'for (const key of ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_PAGES_PROJECT"]) if (!process.env[key]) throw new Error("Variable manquante : " + key)'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter invite build
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/invite/dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=main
