@@ -1,0 +1,14 @@
+{
+  "name": "@onyva/shared",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./demo": "./src/demo.ts",
+    "./calendar": "./src/calendar.ts",
+    "./database": "./src/generated/database.ts"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "provenance": {
+    "source": "https://doc.navitia.io/#journey-planning",
+    "kind": "exemples de contrat, pas une capture PRIM",
+    "capturedFromPrim": false
+  },
+  "participants": [
+    {
+      "participantId": "alice",
+      "response": {
+        "journeys": [
+          {
+            "duration": 1200,
+            "departure_date_time": "20261102T190000",
+            "arrival_date_time": "20261102T192000",
+            "to": {
+              "id": "station-a"
+            }
+          },
+          {
+            "duration": 1800,
+            "departure_date_time": "20261102T190000",
+            "arrival_date_time": "20261102T193000",
+            "to": {
+              "id": "station-b"
+            }
+          },
+          {
+            "duration": 600,
+            "departure_date_time": "20261102T190000",
+            "arrival_date_time": "20261102T191000",
+            "to": {
+              "id": "alone"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "participantId": "bob",
+      "response": {
+        "journeys": [
+          {
+            "duration": 1200,
+            "departure_date_time": "20261102T190000",
+            "arrival_date_time": "20261102T192000",
+            "to": {
+              "id": "station-a"
+            }
+          },
+          {
+            "duration": 600,
+            "departure_date_time": "20261102T190000",
+            "arrival_date_time": "20261102T191000",
+            "to": {
+              "id": "station-b"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

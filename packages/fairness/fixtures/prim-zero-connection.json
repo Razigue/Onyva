@@ -1,0 +1,165 @@
+{
+  "provenance": {
+    "capturedFromPrim": true,
+    "capturedAt": "2026-11-03T23:17:47.984861Z",
+    "source": "PRIM IDFM/Navitia, réponse réelle conservée après validation Zod, stations publiques de test"
+  },
+  "at": "2026-11-04T18:00:00.000Z",
+  "direction": "arrival",
+  "response": {
+    "journeys": [
+      {
+        "status": "",
+        "duration": 1659,
+        "sections": [
+          {
+            "to": {
+              "id": "stop_point:IDFM:28738",
+              "name": "Bercy (Paris)",
+              "stop_point": {
+                "id": "stop_point:IDFM:28738",
+                "stop_area": {
+                  "id": "stop_area:IDFM:426135"
+                }
+              },
+              "embedded_type": "stop_point"
+            },
+            "from": {
+              "id": "2.393197;48.827471",
+              "name": "4 Rue du Général de Langle de Cary (Paris)",
+              "embedded_type": "address"
+            },
+            "mode": "walking",
+            "type": "crow_fly",
+            "arrival_date_time": "20261104T183100",
+            "departure_date_time": "20261104T183100"
+          },
+          {
+            "to": {
+              "id": "stop_point:IDFM:10089",
+              "name": "Porte de Charenton (Paris)",
+              "stop_point": {
+                "id": "stop_point:IDFM:10089",
+                "stop_area": {
+                  "id": "stop_area:IDFM:71579"
+                }
+              },
+              "embedded_type": "stop_point"
+            },
+            "from": {
+              "id": "stop_point:IDFM:28738",
+              "name": "Bercy (Paris)",
+              "stop_point": {
+                "id": "stop_point:IDFM:28738",
+                "stop_area": {
+                  "id": "stop_area:IDFM:426135"
+                }
+              },
+              "embedded_type": "stop_point"
+            },
+            "type": "public_transport",
+            "data_freshness": "base_schedule",
+            "arrival_date_time": "20261104T183600",
+            "departure_date_time": "20261104T183100",
+            "display_informations": {
+              "code": "111",
+              "name": "111",
+              "network": "Bord de Marne"
+            }
+          },
+          {
+            "to": {
+              "id": "stop_point:IDFM:22208",
+              "name": "Porte de Charenton (Paris)",
+              "stop_point": {
+                "id": "stop_point:IDFM:22208",
+                "stop_area": {
+                  "id": "stop_area:IDFM:71579"
+                }
+              },
+              "embedded_type": "stop_point"
+            },
+            "from": {
+              "id": "stop_point:IDFM:10089",
+              "name": "Porte de Charenton (Paris)",
+              "stop_point": {
+                "id": "stop_point:IDFM:10089",
+                "stop_area": {
+                  "id": "stop_area:IDFM:71579"
+                }
+              },
+              "embedded_type": "stop_point"
+            },
+            "mode": "walking",
+            "type": "transfer",
+            "arrival_date_time": "20261104T184029",
+            "departure_date_time": "20261104T183600"
+          },
+          {
+            "type": "waiting",
+            "arrival_date_time": "20261104T184359",
+            "departure_date_time": "20261104T184029"
+          },
+          {
+            "to": {
+              "id": "stop_point:IDFM:463000",
+              "name": "Bastille (Paris)",
+              "stop_point": {
+                "id": "stop_point:IDFM:463000",
+                "stop_area": {
+                  "id": "stop_area:IDFM:463564"
+                }
+              },
+              "embedded_type": "stop_point"
+            },
+            "from": {
+              "id": "stop_point:IDFM:22208",
+              "name": "Porte de Charenton (Paris)",
+              "stop_point": {
+                "id": "stop_point:IDFM:22208",
+                "stop_area": {
+                  "id": "stop_area:IDFM:71579"
+                }
+              },
+              "embedded_type": "stop_point"
+            },
+            "type": "public_transport",
+            "data_freshness": "base_schedule",
+            "arrival_date_time": "20261104T185415",
+            "departure_date_time": "20261104T184359",
+            "display_informations": {
+              "code": "8",
+              "name": "8",
+              "network": "RATP"
+            }
+          },
+          {
+            "to": {
+              "id": "2.367313;48.852304",
+              "name": "6 Rue Jacques Cœur (Paris)",
+              "embedded_type": "address"
+            },
+            "from": {
+              "id": "stop_point:IDFM:463000",
+              "name": "Bastille (Paris)",
+              "stop_point": {
+                "id": "stop_point:IDFM:463000",
+                "stop_area": {
+                  "id": "stop_area:IDFM:463564"
+                }
+              },
+              "embedded_type": "stop_point"
+            },
+            "mode": "walking",
+            "type": "street_network",
+            "arrival_date_time": "20261104T185839",
+            "departure_date_time": "20261104T185415"
+          }
+        ],
+        "arrival_date_time": "20261104T185839",
+        "departure_date_time": "20261104T183100"
+      }
+    ],
+    "disruptions": []
+  }
+}

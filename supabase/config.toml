@@ -1,0 +1,27 @@
+project_id = "onyva"
+
+[api]
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+port = 54322
+major_version = 17
+
+[auth]
+site_url = "http://localhost:8082"
+additional_redirect_urls = ["http://localhost:8082/auth", "http://127.0.0.1:8082/auth", "onyva://auth"]
+enable_signup = true
+
+[functions.recommend]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false
+
+[functions.dispatch-notifications]
+verify_jwt = false
+
+[functions.location]
+verify_jwt = false

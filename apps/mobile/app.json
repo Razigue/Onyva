@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Onyva",
+    "slug": "onyva",
+    "scheme": "onyva",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "fr.onyva.app",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "fr.onyva.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "name": "Onyva",
+      "lang": "fr"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Ajoute ta sortie à ton calendrier.",
+          "remindersPermission": "Ajoute ta sortie à tes rappels."
+        }
+      ],
+      "@maplibre/maplibre-react-native",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Partage ton arrivée avec tes amis, même quand ton écran est verrouillé. Le partage s’arrête à ton arrivée ou après 90 min.",
+          "locationWhenInUsePermission": "Utilise ta position pour partager ton arrivée.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ]
+  }
+}
