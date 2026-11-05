@@ -2,24 +2,23 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { Database } from '@onyva/shared/database';
 import type { ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Crypto from 'expo-crypto';
 import { AppState } from 'react-native';
 import { z } from 'zod';
-import { isExpired, outingSchema, previewCacheSchema, recommendationResponseSchema, primCoverageSchema, stationSchema, venueSchema, venueReactionsSchema } from '@onyva/shared';
-import type { Outing, Participant, RecommendationResponse, Station, VenueReaction, Venue, PrimCoverage } from '@onyva/shared';
-import { previewCatalog, previewData, previewStations } from './preview';
-import { demoPlanner } from '@onyva/shared/demo';
-import { rankVenues } from '@onyva/fairness';
-import { supabase } from './supabase';
+import { isExpired, outingSchema, recommendationResponseSchema, primCoverageSchema, stationSchema, venueSchema, venueReactionsSchema } from '@onyva/shared';
+import type { Outing, RecommendationResponse, Station, VenueReaction, Venue, PrimCoverage } from '@onyva/shared';
+import { ensureSession, supabase } from './supabase';
 
 const cacheKey = 'onyva:current:v1';
-const previewCacheKey = 'onyva:current:preview:v2';
+// Former local trial outings with simulated journeys. Removed on startup.
+const legacyPreviewCacheKey = 'onyva:current:preview:v2';
+const nameKey = 'onyva:name';
 const cacheSchema = z.object({ outing: outingSchema, results: recommendationResponseSchema.nullable() });
 type NewOuting = { startsAt: string; endsAt: string; activity: Outing['activity']; departureId: string };
 type State = {
   outing: Outing | null; results: RecommendationResponse | null; stations: Station[];
   ready: boolean; busy: boolean; error: string | null; userId: string | null; name: string;
-  cached: boolean; create: (input: NewOuting, demo: boolean) => Promise<Outing>;
+  anonymous: boolean; sessionFailed: boolean; saveName: (name: string) => Promise<void>;
+  cached: boolean; create: (input: NewOuting, personName: string) => Promise<Outing>;
   add: (name: string, departureId: string, returnId: string) => Promise<void>;
   remove: (id: string) => Promise<void>; confirm: (venueId: string) => Promise<void>;
   refresh: () => Promise<void>; join: (code: string, name: string, departureId: string, returnId: string) => Promise<void>;
@@ -48,42 +47,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [cached, setCached] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [name, setName] = useState('Toi');
+  const [name, setName] = useState('');
+  const [anonymous, setAnonymous] = useState(true);
+  const [sessionFailed, setSessionFailed] = useState(false);
   const [reactions, setReactions] = useState<VenueReaction[]>([]);
   const [coverage, setCoverage] = useState<PrimCoverage | null>(null);
   const revision = useRef(0);
   const account = useRef<string | null>(null);
   useEffect(() => {
-    // Old demo results contain fictional venues. Keep private live caches intact.
-    void AsyncStorage.removeItem(cacheKey);
-    setOuting(current => current?.mode === 'demo' ? null : current);
-    setResults(current => current?.source === 'demo' ? null : current);
-    void AsyncStorage.getItem(previewCacheKey).then(raw => {
-      if (account.current) return;
-      const parsed = raw ? previewCacheSchema.safeParse(JSON.parse(raw)) : null;
-      if (parsed?.success && !isExpired(parsed.data.outing) && parsed.data.outing.mode === 'demo') {
-        setOuting(parsed.data.outing); setResults(parsed.data.results); setCached(true);
-      } else if (raw) void AsyncStorage.removeItem(previewCacheKey);
-    }).catch(() => setError('La dernière sortie n’a pas pu être restaurée.')).finally(() => setReady(true));
+    void AsyncStorage.multiRemove([cacheKey, legacyPreviewCacheKey]).catch(() => undefined);
+    void AsyncStorage.getItem(nameKey).then(saved => { if (saved) setName(current => current || saved); }).catch(() => undefined).finally(() => setReady(true));
     if (!supabase) return;
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    const client = supabase;
+    // Every device gets an invisible anonymous session, so the app works without an account.
+    const start = () => { void ensureSession().then(() => setSessionFailed(false)).catch(() => setSessionFailed(true)); };
+    const { data } = client.auth.onAuthStateChange((event, session) => {
       const uid = session?.user.id ?? null;
       const changed = account.current !== uid;
       account.current = uid;
-      if (changed) { ++revision.current; setResults(current => current?.source === 'demo' ? current : null); }
+      if (changed) { ++revision.current; setResults(null); }
       const generation = revision.current;
       setUserId(uid);
-      setOuting(current => current?.mode === 'live' && !current.participants.some(p => p.userId === uid) ? null : current);
-      setName(typeof session?.user.user_metadata.given_name === 'string' ? session.user.user_metadata.given_name : 'Toi');
-      // Restore private cached content only for the signed-in account.
+      setAnonymous(session?.user.is_anonymous ?? true);
+      setOuting(current => current && !current.participants.some(p => p.userId === uid) ? null : current);
+      const given = session?.user.user_metadata.given_name;
+      if (typeof given === 'string' && given.trim()) setName(given.trim());
+      if (!session && (event === 'INITIAL_SESSION' || event === 'SIGNED_OUT')) setTimeout(start, 0);
+      // Restore private cached content only for the current session.
       if (uid && changed) void AsyncStorage.getItem(`${cacheKey}:${uid}`).then(raw => {
         if (account.current !== uid || revision.current !== generation) return;
         const parsed = raw ? cacheSchema.safeParse(JSON.parse(raw)) : null;
-        if (parsed?.success && parsed.data.outing.mode === 'live' && parsed.data.outing.participants.some(person => person.userId === uid) && !isExpired(parsed.data.outing)) { setOuting(parsed.data.outing); setResults(parsed.data.results); setCached(true); }
+        if (parsed?.success && parsed.data.outing.participants.some(person => person.userId === uid) && !isExpired(parsed.data.outing)) { setOuting(parsed.data.outing); setResults(parsed.data.results); setCached(true); }
         else if (raw) void AsyncStorage.removeItem(`${cacheKey}:${uid}`);
       }).catch(() => undefined);
     });
-    return () => data.subscription.unsubscribe();
+    // Retry while offline or while the service refuses new sessions.
+    const timer = setInterval(() => { if (!account.current) start(); }, 15_000);
+    const listener = AppState.addEventListener('change', state => { if (state === 'active' && !account.current) start(); });
+    return () => { data.subscription.unsubscribe(); clearInterval(timer); listener.remove(); };
   }, []);
 
   useEffect(() => {
@@ -124,13 +125,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready || !outing) return;
-    if (outing.mode === 'live' && (!userId || account.current !== userId || !outing.participants.some(person => person.userId === userId))) return;
-    const key = outing.mode === 'demo' ? previewCacheKey : `${cacheKey}:${userId}`;
-    void AsyncStorage.setItem(key, JSON.stringify({ outing, results })).catch(() => setError('La sauvegarde hors connexion est indisponible.'));
+    if (!userId || account.current !== userId || !outing.participants.some(person => person.userId === userId)) return;
+    void AsyncStorage.setItem(`${cacheKey}:${userId}`, JSON.stringify({ outing, results })).catch(() => setError('La sauvegarde hors connexion est indisponible.'));
   }, [outing, results, ready, userId]);
 
   useEffect(() => {
-    const expire = () => { if (outing && isExpired(outing)) { setOuting(null); setResults(null); void AsyncStorage.removeItem(outing.mode === 'demo' ? previewCacheKey : `${cacheKey}:${userId}`); } };
+    const expire = () => { if (outing && isExpired(outing)) { setOuting(null); setResults(null); void AsyncStorage.removeItem(`${cacheKey}:${userId}`); } };
     const timer = setInterval(expire, 30_000);
     const listener = AppState.addEventListener('change', expire);
     return () => { clearInterval(timer); listener.remove(); };
@@ -138,41 +138,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const resultRevision = useRef('');
   const compute = useCallback(async (next: Outing) => {
-    if (next.mode === 'live' && !next.participants.some(person => person.userId === account.current)) throw new Error('Reconnecte-toi pour retrouver cette sortie.');
+    if (!next.participants.some(person => person.userId === account.current)) throw new Error('Cette sortie n’est pas liée à ce téléphone.');
     const generation = ++revision.current;
     setOuting(next); setCached(false); setError(null);
     if (next.confirmedVenueId) {
-      if (next.mode === 'live') {
-        const saved = recommendationResponseSchema.safeParse(await rpc('get_recommendations', { outing_id: next.id }));
-        if (saved.success && generation === revision.current) setResults(saved.data);
-      }
+      const saved = recommendationResponseSchema.safeParse(await rpc('get_recommendations', { outing_id: next.id }));
+      if (saved.success && generation === revision.current) setResults(saved.data);
       setBusy(false); return;
     }
     const key = `${next.id}:${next.updatedAt}`;
     if (resultRevision.current !== key) setResults(null);
     resultRevision.current = key;
-    if (next.mode === 'live' && !(next.selectedVenue ? coverage?.manualReady : coverage?.ready)) { setResults(null); setBusy(false); return; }
+    if (!(next.selectedVenue ? coverage?.manualReady : coverage?.ready)) { setResults(null); setBusy(false); return; }
     if (next.participants.length < 2) { setBusy(false); return; }
     setBusy(true);
     let pending = false;
     try {
       let response: RecommendationResponse;
-      if (next.mode === 'demo') {
-        await new Promise(resolve => setTimeout(resolve, 50));
-        const startsAt = Date.parse(next.startsAt) / 1000;
-        const endsAt = Date.parse(next.endsAt) / 1000;
-        const { venues } = previewData(startsAt, endsAt, next.activity);
-        response = { recommendations: rankVenues({ participants: next.participants, venues, startsAt, endsAt, kind: next.activity, plan: demoPlanner }), computedAt: new Date().toISOString(), source: 'demo', warnings: [`Lieux réels OpenStreetMap, catalogue du ${new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'long' }).format(new Date(previewCatalog.fetchedAt))}. Vérifie les horaires du lieu. Trajets et retours simulés.`] };
+      if (!supabase) throw new Error('Le service est indisponible.');
+      const saved = recommendationResponseSchema.safeParse(await rpc('get_recommendations', { outing_id: next.id }));
+      if (saved.success && Date.parse(saved.data.computedAt) > Date.now() - 60_000) {
+        response = saved.data;
       } else {
-        if (!supabase) throw new Error('Le service est indisponible.');
-        const saved = recommendationResponseSchema.safeParse(await rpc('get_recommendations', { outing_id: next.id }));
-        if (saved.success && Date.parse(saved.data.computedAt) > Date.now() - 60_000) {
-          response = saved.data;
-        } else {
-          const { data, error } = await supabase.functions.invoke('recommend', { body: { outingId: next.id } });
-          if (error) throw new Error('Les trajets sont indisponibles. Réessaie dans un instant.');
-          response = recommendationResponseSchema.parse(data);
-        }
+        const { data, error } = await supabase.functions.invoke('recommend', { body: { outingId: next.id } });
+        if (error) throw new Error('Les trajets sont indisponibles. Réessaie dans un instant.');
+        response = recommendationResponseSchema.parse(data);
       }
       pending = !!response.progress && !['complete','failed'].includes(response.progress.stage);
       if (generation === revision.current) { setResults(response); if (response.progress?.stage === 'failed') setError(response.warnings.join(' ')); }
@@ -183,22 +173,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     if (!outing) return;
     try {
-      const next = outing.mode === 'demo' ? outing : outingSchema.parse(await rpc('get_outing', { outing_id: outing.id }));
+      const next = outingSchema.parse(await rpc('get_outing', { outing_id: outing.id }));
       await compute(next);
     } catch { setError('Tu es peut-être hors connexion. La dernière version reste disponible.'); setCached(true); }
   }, [outing, compute]);
 
   useEffect(() => {
-    if (!outing || outing.mode !== 'live' || !supabase) return;
+    if (!outing || !supabase) return;
     // Polling is a fallback that also works when the project has not enabled Realtime.
     const timer = setInterval(() => { void refresh(); }, busy ? 1000 : 15_000);
     return () => clearInterval(timer);
   }, [outing, refresh, busy]);
 
-  const outingId = outing?.id, outingMode = outing?.mode;
+  const outingId = outing?.id;
   useEffect(() => {
     setReactions([]);
-    if (!outingId || outingMode !== 'live' || !userId) return;
+    if (!outingId || !userId) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -209,15 +199,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void load();
     const timer = setInterval(() => void load(), 15_000);
     return () => { cancelled = true; clearInterval(timer); };
-  }, [outingId, outingMode, userId]);
+  }, [outingId, userId]);
 
   async function react(venueId: string, liked: boolean) {
     if (!outing || outing.confirmedVenueId || !results?.recommendations.some(r => r.venue.id === venueId)) throw new Error('Actualise les propositions avant de réagir.');
-    if (outing.mode === 'live') {
-      setReactions(venueReactionsSchema.parse(await rpc('set_venue_reaction', { outing_id: outing.id, venue_id: venueId, liked })));
-    } else {
-      setReactions(current => [...current.filter(r => r.venueId !== venueId), ...(liked ? [{ venueId, userId: '00000000-0000-4000-8000-000000000000' }] : [])]);
-    }
+    setReactions(venueReactionsSchema.parse(await rpc('set_venue_reaction', { outing_id: outing.id, venue_id: venueId, liked })));
   }
 
   async function openOuting(id: string) {
@@ -225,39 +211,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   async function findVenues(stationId: string) {
-    if (!outing || outing.mode !== 'live') return [];
+    if (!outing) return [];
     return z.array(venueSchema).parse(await rpc('list_outing_venues', { target: outing.id, station_id: stationId }));
   }
   async function selectVenue(venue: Venue) {
-    if (!outing || outing.mode !== 'live') return;
+    if (!outing) return;
     const next = outingSchema.parse(await rpc('select_outing_venue', { target: outing.id, station_id: venue.stationId, venue_id: venue.id }));
     await compute(next);
   }
-  async function create(input: NewOuting, demo: boolean) {
-    const now = new Date().toISOString();
-    const next = demo ? outingSchema.parse({ ...input, id: Crypto.randomUUID(), ownerId: 'demo-owner', inviteCode: Crypto.randomUUID(), updatedAt: now, mode: 'demo', confirmedVenueId: null, participants: [{ id: Crypto.randomUUID(), userId: null, name: 'Toi', departureId: input.departureId, returnId: input.departureId }] }) : outingSchema.parse(await rpc('create_outing', { payload: { ...input, name } }));
+  async function saveName(value: string) {
+    const trimmed = value.trim().slice(0, 40);
+    if (!trimmed) throw new Error('Indique ton prénom.');
+    setName(trimmed);
+    await AsyncStorage.setItem(nameKey, trimmed).catch(() => undefined);
+  }
+  async function create(input: NewOuting, personName: string) {
+    if (!personName.trim()) throw new Error('Indique ton prénom.');
+    const next = outingSchema.parse(await rpc('create_outing', { payload: { ...input, name: personName.trim() } }));
     await compute(next);
     return next;
   }
-  async function updateParticipants(participants: Participant[]) {
-    if (!outing || outing.confirmedVenueId) throw new Error('Cette sortie est déjà confirmée.');
-    setReactions([]);
-    await compute(outingSchema.parse({ ...outing, participants, updatedAt: new Date().toISOString() }));
-  }
   async function add(personName: string, departureId: string, returnId: string) {
     if (!outing) return;
-    if (outing.mode === 'demo') await updateParticipants([...outing.participants, { id: Crypto.randomUUID(), userId: null, name: personName, departureId, returnId }]);
-    else await compute(outingSchema.parse(await rpc('add_participant', { outing_id: outing.id, person_name: personName, departure_id: departureId, return_id: returnId })));
+    await compute(outingSchema.parse(await rpc('add_participant', { outing_id: outing.id, person_name: personName, departure_id: departureId, return_id: returnId })));
   }
   async function remove(id: string) {
     if (!outing) return;
-    if (outing.mode === 'demo') await updateParticipants(outing.participants.filter(p => p.id !== id));
-    else await compute(outingSchema.parse(await rpc('remove_participant', { outing_id: outing.id, participant_id: id })));
+    await compute(outingSchema.parse(await rpc('remove_participant', { outing_id: outing.id, participant_id: id })));
   }
   async function confirm(venueId: string) {
     if (!outing || !results?.recommendations.some(r => r.venue.id === venueId)) throw new Error('Actualise les propositions avant de confirmer.');
-    if (outing.mode === 'live') setOuting(outingSchema.parse(await rpc('confirm_venue', { outing_id: outing.id, venue_id: venueId })));
-    else setOuting({ ...outing, confirmedVenueId: venueId, updatedAt: new Date().toISOString() });
+    setOuting(outingSchema.parse(await rpc('confirm_venue', { outing_id: outing.id, venue_id: venueId })));
   }
   async function join(code: string, personName: string, departureId: string, returnId: string) {
     const resolved = code.length === 8 ? await rpc('resolve_invite_code', { short_code: code }) : code;
@@ -266,9 +250,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
   async function clear() {
     ++revision.current; setOuting(null); setResults(null);
-    await AsyncStorage.multiRemove([cacheKey, previewCacheKey, `${cacheKey}:${userId}`]);
+    await AsyncStorage.multiRemove([cacheKey, legacyPreviewCacheKey, `${cacheKey}:${userId}`]);
   }
-  return <Context.Provider value={{ outing, results, stations: outing?.mode === 'demo' || !userId ? previewStations : stations, ready, busy, error, userId, name, cached, create, add, remove, confirm, refresh, join, clear, setError, reactions, react, openOuting, coverage, findVenues, selectVenue }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ outing, results, stations, ready, busy, error, userId, name, anonymous, sessionFailed, saveName, cached, create, add, remove, confirm, refresh, join, clear, setError, reactions, react, openOuting, coverage, findVenues, selectVenue }}>{children}</Context.Provider>;
 }
 
 export function useStore() { const value = useContext(Context); if (!value) throw new Error('StoreProvider is missing'); return value; }

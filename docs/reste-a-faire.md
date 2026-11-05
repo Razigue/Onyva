@@ -7,7 +7,7 @@
 - Application locale : http://localhost:8082.
 - Page d’invitation locale : http://localhost:4174. Une URL locale ne fonctionne pas chez un ami distant.
 - Supabase distant : migrations jusqu’à 0014 et quatre fonctions déployées, RLS et planifications actives.
-- Connexion Google réelle vérifiée. Apple reste volontairement en attente.
+- Utilisation sans compte par session anonyme, plafond PRIM par personne. Google facultatif pour relier la session, vérifié en réel avant ce changement. Apple reste volontairement en attente.
 - Création, adhésion par code court ou lien, choix manuel d’un lieu ouvert, allers et retours PRIM, confirmation partagée et cache hors connexion.
 - Catalogue de 24 879 lieux OSM et 15 382 stations actives. Les libellés des stations incluent désormais la commune quand PRIM la fournit.
 - Recherche automatique du juste milieu désactivée. Les isochrones tabulaires restent à résoudre avant sa reprise.

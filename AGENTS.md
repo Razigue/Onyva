@@ -7,7 +7,7 @@ Instructions pour les agents qui travaillent sur Onyva. Lire `PRODUCT.md` avant 
 Onyva est une application Expo iOS et Android qui cherche un lieu de rencontre équitable en transports en commun en Île-de-France.
 
 1. L’application parle à Supabase.
-2. Supabase fournit PostgreSQL, PostGIS, Auth Apple et Google, Realtime, les Edge Functions et pg_cron.
+2. Supabase fournit PostgreSQL, PostGIS, Auth anonyme avec Apple et Google facultatifs, Realtime, les Edge Functions et pg_cron.
 3. Les Edge Functions utilisent le calculateur Navitia de PRIM. La clé reste côté serveur. Aucun serveur de routage ni VM n’est nécessaire.
 4. Une tâche GitHub Actions hebdomadaire importe les lieux depuis l’extrait régional OpenStreetMap, sans Overpass.
 
@@ -101,7 +101,8 @@ La recherche du juste milieu est en pause. `RECOMMENDATIONS_ENABLED=false` désa
 ## Application et invitations
 
 - Expo Router, NativeWind, MapLibre et fonds OpenFreeMap.
-- Connexion Apple et Google uniquement via Supabase. Apple est obligatoire sur iOS dès que Google est proposé.
+- Aucun compte requis : session anonyme Supabase créée au premier lancement, prénom saisi par la personne. Apple et Google servent seulement à relier la session (`linkIdentity`) ou à retrouver un compte existant. Apple est obligatoire sur iOS dès que Google est proposé.
+- Plus d’essai local avec des trajets simulés. Chaque session a un plafond quotidien d’appels PRIM via `reserve_prim_user_call`.
 - `expo-location` et `expo-task-manager` pour le suivi. Build de développement obligatoire, pas Expo Go pour l’arrière-plan.
 - Notifications Expo envoyées par Edge Function, avec consentement, reprises bornées et contrôle des reçus.
 - La sortie courante reste lisible hors connexion.

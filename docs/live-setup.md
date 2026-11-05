@@ -8,7 +8,8 @@ La stack active utilise Expo, Supabase et PRIM, plus un import OSM hebdomadaire.
 | --- | --- |
 | PRIM | Clé autorisée pour Navitia, quota gratuit exact confirmé dans « Ma consommation API », débit et conditions de cache |
 | Supabase | Projet gratuit, URL, clé publique, clé serveur, identifiants CLI de déploiement |
-| Google et Apple | Identifiants OAuth dans Supabase, URL de retour autorisées ; Apple obligatoire avant distribution iOS avec Google |
+| Sessions anonymes | « Allow anonymous sign-ins » et « Allow manual linking » activés dans Supabase Auth, limite de création par IP conservée |
+| Google et Apple | Facultatifs. Identifiants OAuth dans Supabase, URL de retour autorisées ; Apple obligatoire avant distribution iOS avec Google |
 | Expo/EAS | Projet, signature Android/iOS, FCM V1/APNs, identifiant public du projet et fichier Firebase pour Android |
 | Cloudflare Pages | Projet d’invitations, variables publiques et associations de signature |
 | GitHub Actions | Secrets de l’import régional et du déploiement, minutes gratuites disponibles |
@@ -107,7 +108,7 @@ Pour iOS, configurer la signature et les appareils autorisés avant le build cor
 
 ## Vérification sur le terrain
 
-- Connexion réelle sur deux téléphones, puis création et invitation après connexion.
+- Premier lancement sans compte sur deux téléphones : session anonyme, prénom, création et invitation. Puis liaison facultative d’un compte Google.
 - Résultats progressifs ; aucun lieu confirmable avant la vérification de tous ses retours.
 - Réaction de l’invité visible par l’organisateur, puis notification de confirmation et calendrier.
 - Installation depuis Google Play avec le referrer ; installation iOS après copie du code, avec proposition de collage au premier lancement.

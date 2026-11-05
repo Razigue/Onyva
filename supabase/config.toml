@@ -13,6 +13,14 @@ major_version = 17
 site_url = "http://localhost:8082"
 additional_redirect_urls = ["http://localhost:8082/auth", "http://127.0.0.1:8082/auth", "onyva://auth"]
 enable_signup = true
+# Session anonyme invisible au premier lancement : l’application s’utilise sans compte.
+enable_anonymous_sign_ins = true
+# Permet de relier plus tard un compte Google ou Apple à la session anonyme.
+enable_manual_linking = true
+
+[auth.rate_limit]
+# Créations de sessions anonymes par heure et par adresse IP.
+anonymous_users = 30
 
 [functions.recommend]
 verify_jwt = false
