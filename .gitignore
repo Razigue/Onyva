@@ -1,0 +1,23 @@
+node_modules/
+.expo/
+dist/
+dist-native/
+.turbo/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.local
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
+data/
+*.tsbuildinfo
+google-services.json
+GoogleService-Info.plist
+
+# Documents de travail locaux
+/Idée Mi-chemin.pdf
+/image.png
+/maquette.png
