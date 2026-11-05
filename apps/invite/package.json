@@ -1,0 +1,1 @@
+{"name":"invite","private":true,"type":"module","scripts":{"dev":"vite --port 4174","build":"vite build && node scripts/associations.mjs"},"dependencies":{"@onyva/shared":"workspace:*"},"devDependencies":{"vite":"^6.4.1"}}
