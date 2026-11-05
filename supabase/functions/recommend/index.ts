@@ -34,6 +34,11 @@ Deno.serve(async (request) => {
     const input = recommendationInvocationSchema.safeParse(await request.json());
     if (!input.success) return reply({ error: 'Demande invalide.' }, 400);
     const key = Deno.env.get('PRIM_API_KEY'), dailyLimit = Number(Deno.env.get('PRIM_DAILY_LIMIT'));
+    // Per-person cap so that one anonymous session cannot drain the shared free quota.
+    const configuredUserLimit = Number(Deno.env.get('PRIM_USER_DAILY_LIMIT') ?? 100);
+    const userLimit = Number.isInteger(configuredUserLimit) && configuredUserLimit > 0
+      ? Math.min(configuredUserLimit, dailyLimit)
+      : Math.min(100, dailyLimit);
     const configured = Deno.env.get('PRIM_QUOTA_CONFIRMED') === 'true' && Boolean(key) &&
       Number.isInteger(dailyLimit) && dailyLimit > 0 && dailyLimit <= 1000000;
     const enabled = Deno.env.get('RECOMMENDATIONS_ENABLED') !== 'false';
@@ -101,9 +106,10 @@ Deno.serve(async (request) => {
         if (value.error) throw new Error('Cache indisponible.');
       },
       reserve: async () => {
-        const value = await admin.rpc('reserve_prim_call', {
-          api_name: 'general',
+        const value = await admin.rpc('reserve_prim_user_call', {
+          requester: user.data.user.id,
           daily_limit: dailyLimit,
+          user_limit: userLimit,
         });
         if (value.error) throw new Error('Quota indisponible.');
         return value.data === true;

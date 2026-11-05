@@ -5,15 +5,15 @@ Onyva accompagne une sortie entre amis en Île-de-France : trouver un lieu équi
 ## Pourquoi
 
 - Problème : le lieu est choisi au hasard, quelqu’un se retrouve avec 50 minutes de trajet et le retour tardif est oublié.
-- Promesse : un lien dans le groupe, une connexion Apple ou Google, un lieu juste pour tout le monde.
+- Promesse : un lien dans le groupe, aucun compte à créer, un lieu juste pour tout le monde.
 - Public : groupes de 2 à 10 amis, pour un verre, un dîner ou un café.
 - Différence : horaires et perturbations IDFM, retour pris en compte, saisie par station et partage temporaire de la position pendant la sortie.
 
 ## Principes d’usage
 
-L’application demande le minimum nécessaire : trois gestes pour créer une sortie et deux pour la rejoindre une fois connecté.
+L’application demande le minimum nécessaire : trois gestes pour créer une sortie et deux pour la rejoindre, sans compte.
 
-1. Une connexion Apple ou Google, sans mot de passe ni formulaire. Le prénom vient du compte et la session reste ouverte.
+1. Aucun compte requis. Au premier lancement, le téléphone reçoit une session anonyme invisible et la personne saisit seulement son prénom. Relier un compte Apple ou Google reste facultatif : il sert à retrouver ses sorties sur un autre téléphone ou après une réinstallation.
 2. Des valeurs préremplies : ce soir, le prochain créneau rond au moins une heure plus tard, un verre et le dernier départ utilisé.
 3. Une station plutôt qu’une adresse. « Ma position » devient la station la plus proche. Aucune adresse exacte n’est montrée aux autres.
 4. Une preuve visible de l’équité : une barre de temps par personne et l’écart maximum.
@@ -33,7 +33,7 @@ Une sortie va de la création à l’expiration en sept étapes.
    - Résumé : le lien, le partage natif ou WhatsApp et l’ajout manuel des participants.
 
    Chaque écran est prérempli : « Suivant », « Suivant », « Créer » suffit.
-2. **Rejoindre, pour l’invité.** Si l’application est installée, le lien ouvre la sortie. Sinon, la page montre qui invite, quand et qui a déjà rejoint, avec les liens vers les boutiques. Sur Android, le lien Google Play transporte le code par Install Referrer ; l’application le récupère au premier lancement. Sur iOS, la page affiche un code court et un bouton pour le copier avant l’installation ; l’application propose de le coller ou de le saisir au premier lancement. Aucune lecture automatique du presse-papier. L’invité se connecte avec Apple ou Google, choisit son départ et son retour, identiques par défaut, puis vote si nécessaire. Contraintes facultatives inchangées : budget et accessibilité en fauteuil.
+2. **Rejoindre, pour l’invité.** Si l’application est installée, le lien ouvre la sortie. Sinon, la page montre qui invite, quand et qui a déjà rejoint, avec les liens vers les boutiques. Sur Android, le lien Google Play transporte le code par Install Referrer ; l’application le récupère au premier lancement. Sur iOS, la page affiche un code court et un bouton pour le copier avant l’installation ; l’application propose de le coller ou de le saisir au premier lancement. Aucune lecture automatique du presse-papier. L’invité saisit son prénom, choisit son départ et son retour, identiques par défaut, puis vote si nécessaire. Contraintes facultatives inchangées : budget et accessibilité en fauteuil.
 3. **Choisir le lieu.** Résultats progressifs, avec un objectif d’environ trois secondes pour dix personnes. Une isochrone par participant à l’heure du rendez-vous sert au classement des stations. La station minimise le trajet le plus long, puis la somme, puis l’écart. Les allers à l’heure d’arrivée et les retours sont vérifiés pour les trois meilleurs lieux avant confirmation. L’application propose jusqu’à douze restaurants ou six lieux pour les autres activités ; ce sont des plafonds, seuls les lieux effectivement vérifiés sont affichés comme confirmables. Les alternatives de dîner favorisent les cuisines documentées, en conservant le meilleur choix et l’ordre d’équité. Chaque carte montre les temps individuels, l’écart, le dernier horaire de retour possible et les perturbations prises en compte. Une carte montre départs et lieux. Chacun peut réagir, l’organisateur confirme.
 4. **Après confirmation.** Chacun reçoit le lieu, son itinéraire personnel et un ajout au calendrier en un geste.
 5. **Avant de partir.** Rappel « pars dans 10 min » calculé sur l’itinéraire en temps réel. Si une perturbation rend le lieu clairement inéquitable, une nouvelle suggestion est envoyée à l’organisateur.
@@ -70,7 +70,7 @@ Le compte est conservé ; tout ce qui est lié à une sortie est supprimé 24 h 
 | Bars, restaurants, cafés, cuisines et horaires | Extrait OpenStreetMap régional importé chaque semaine par GitHub Actions, recherche PostGIS | Catalogue de référence dans Supabase, remplacé atomiquement ; anciens imports supprimés |
 | Sortie, participants et stations de départ/retour | Supabase | Suppression 24 h après la fin |
 | Position en direct | Envoi HTTP puis relais Supabase Realtime privé | Aucun stockage en base ou dans les logs ; arrêt à l’arrivée ou après 90 min |
-| Identité | Compte Apple ou Google : identifiant, prénom, adresse électronique, relais privé Apple accepté | Jusqu’à la suppression du compte |
+| Identité | Session anonyme : identifiant technique et prénom saisi. Si un compte Apple ou Google est relié : prénom, adresse électronique, relais privé Apple accepté | Jusqu’à la suppression du compte ou des données |
 | Invitation après installation | Install Referrer Google Play ou code court copié par l’invité sur iOS | Jusqu’à utilisation ou expiration de l’invitation |
 
 Aucune adresse exacte de participant ni traceur publicitaire. Le compte peut être supprimé depuis l’application.
@@ -81,7 +81,7 @@ La V1 doit être testée sur de vraies sorties avant d’étendre le produit. Le
 
 | Version | Objectif | Contenu |
 | --- | --- | --- |
-| V1 | Le cœur | Création, lien partagé et reprise après installation, connexion Apple ou Google, calcul aller/retour équitable, jusqu’à douze restaurants ou six autres lieux, carte, confirmation, notification et travaux prévus |
+| V1 | Le cœur | Création, lien partagé et reprise après installation, utilisation sans compte avec Apple ou Google facultatifs, calcul aller/retour équitable, jusqu’à douze restaurants ou six autres lieux, carte, confirmation, notification et travaux prévus |
 | V2 | La soirée | Rappel de départ, perturbations en temps réel, position en arrière-plan et carte en direct, messages rapides, vote de créneaux, Vélib |
 | V3 | Retour et habitudes | Dernier départ, compte à rebours, retours partagés, alerte dernier métro et « Refaire avec ce groupe » |
 
@@ -113,4 +113,4 @@ OpenStreetMap fournit les établissements et les cuisines documentées ; une cui
 
 Les alternatives de dîner favorisent les cuisines disponibles : viande, poisson, italien, chinois, japonais, indien, français, oriental, végétarien et autres. Tous les lieux respectent les règles d’ouverture et de retour. Le meilleur choix est conservé et l’ordre reste maximum, somme, écart. Les avis Google Maps sont consultables par lien externe ; aucune note ni aucun avis n’est inventé. Google Places exige toujours une autorisation distincte, car sa facturation est à l’usage.
 
-L’aperçu local sans compte conserve un catalogue OSM daté avec attribution et horaires enregistrés. Ses trajets et retours restent simulés et signalés comme tels. Aucun lieu fictif ni garantie de retour réel n’est ajouté. Une date non couverte ou l’absence d’établissement donne zéro suggestion.
+Il n’existe plus d’essai local avec des trajets simulés. Sans compte, la session anonyme donne accès au parcours complet : stations, lieux réels, trajets PRIM vérifiés et partage. Chaque session a un plafond quotidien d’appels PRIM (`PRIM_USER_DAILY_LIMIT`, 100 par défaut), en plus du plafond partagé. Sans compte relié, supprimer l’application fait perdre l’accès à ses sorties.

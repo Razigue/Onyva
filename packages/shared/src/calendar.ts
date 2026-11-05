@@ -3,10 +3,10 @@ import type { Outing, Venue } from './index';
 export function calendarEvent(outing: Outing, venue: Venue) {
   if (outing.confirmedVenueId !== venue.id) throw new Error('Confirme le lieu avant de l’ajouter au calendrier.');
   return {
-    title: `${outing.mode === 'demo' ? '[Essai] ' : ''}Onyva · ${venue.name}`,
+    title: `Onyva · ${venue.name}`,
     startDate: new Date(outing.startsAt), endDate: new Date(outing.endsAt),
     location: `${venue.name}, ${venue.neighborhood}`,
-    notes: outing.mode === 'demo' ? 'Essai local : trajets et retours simulés.' : 'Retrouve ton trajet aller et retour dans Onyva. Vérifie les perturbations avant de partir.',
+    notes: 'Retrouve ton trajet aller et retour dans Onyva. Vérifie les perturbations avant de partir.',
   };
 }
 

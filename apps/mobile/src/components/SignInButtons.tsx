@@ -5,7 +5,8 @@ import type { z } from 'zod';
 import { Button, Notice, ui } from './ui';
 import { signIn, supabase } from '../lib/supabase';
 
-export default function SignInButtons({ onError }: { onError: (message: string) => void }) {
+// mode 'link' attaches Google or Apple to the current anonymous session, 'signin' opens an existing account.
+export default function SignInButtons({ onError, mode = 'signin' }: { onError: (message: string) => void; mode?: 'link' | 'signin' }) {
   const [providers, setProviders] = useState<z.infer<typeof authProvidersSchema> | null>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -26,8 +27,8 @@ export default function SignInButtons({ onError }: { onError: (message: string) 
   }, [attempt]);
   async function connect(provider: 'apple' | 'google') {
     setBusy(true); onError('');
-    try { await signIn(provider); }
-    catch { onError('La connexion n’a pas abouti. Réessaie.'); }
+    try { await signIn(provider, mode); }
+    catch (cause) { onError(cause instanceof Error ? cause.message : 'La connexion n’a pas abouti. Réessaie.'); }
     finally { setBusy(false); }
   }
   if (!supabase) return null;
@@ -35,8 +36,8 @@ export default function SignInButtons({ onError }: { onError: (message: string) 
   if (!providers) return <Text style={ui.body}>Chargement des moyens de connexion…</Text>;
   const google = providers.external.google && (Platform.OS !== 'ios' || providers.external.apple);
   return <View style={{ gap: 10 }}>
-    {providers.external.apple && <Button loading={busy} onPress={() => void connect('apple')}>Continuer avec Apple</Button>}
-    {google && <Button secondary loading={busy} onPress={() => void connect('google')}>Continuer avec Google</Button>}
-    {!providers.external.apple && !google && <Notice>La connexion n’est pas encore disponible sur cet appareil.</Notice>}
+    {providers.external.apple && <Button secondary={mode === 'signin'} loading={busy} onPress={() => void connect('apple')}>{mode === 'link' ? 'Relier mon compte Apple' : 'Continuer avec Apple'}</Button>}
+    {google && <Button secondary loading={busy} onPress={() => void connect('google')}>{mode === 'link' ? 'Relier mon compte Google' : 'Continuer avec Google'}</Button>}
+    {!providers.external.apple && !google && <Notice>Aucun compte ne peut être relié sur cet appareil pour le moment.</Notice>}
   </View>;
 }
