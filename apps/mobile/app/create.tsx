@@ -5,7 +5,6 @@ import { ArrowLeft, Coffee, GlassWater, Utensils, Sparkles } from 'lucide-react-
 import { activityLabels, defaultStart } from '@onyva/shared';
 import type { Outing } from '@onyva/shared';
 import { Button, Chip, colors, Field, Notice, Shell, StationPicker, ui } from '../src/components/ui';
-import SignInButtons from '../src/components/SignInButtons';
 import { useStore } from '../src/lib/store';
 import { supabase } from '../src/lib/supabase';
 
@@ -19,20 +18,20 @@ export function parisDate(day: string, time: string): Date | null {
 }
 
 export default function Create() {
-  const { create, stations, userId, outing, coverage } = useStore();
+  const { create, stations, userId, outing, coverage, name, saveName, sessionFailed } = useStore();
   const initial = parisParts(defaultStart());
   const [step, setStep] = useState(0);
   const [day, setDay] = useState(initial.day);
   const [time, setTime] = useState(initial.time);
   const [duration, setDuration] = useState(150);
   const [activity, setActivity] = useState<Outing['activity']>('drinks');
-  const [station, setStation] = useState(outing?.participants[0]?.departureId ?? stations[0]?.id ?? '');
-  const [demo, setDemo] = useState(false);
-  const usingDemo = !supabase || !userId || demo;
+  const [station, setStation] = useState(outing?.participants[0]?.departureId ?? '');
+  const [person, setPerson] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
-    if (stations.length && !stations.some(candidate => candidate.id === station)) setStation(stations[0]!.id);
+    // The full catalog has thousands of stops: never preselect an arbitrary one.
+    if (station && stations.length && !stations.some(candidate => candidate.id === station)) setStation('');
   }, [stations, station]);
   async function next() {
     setError('');
@@ -40,8 +39,9 @@ export default function Create() {
     if (!starts || starts.getTime() < Date.now()) { setError('Choisis une date et une heure à venir, à l’heure de Paris.'); return; }
     if (step < 2) { setStep(step + 1); return; }
     if (!stations.some(s => s.id === station)) { setError('Choisis ta station de départ.'); return; }
+    if (!(person ?? name).trim()) { setError('Indique ton prénom.'); return; }
     setBusy(true);
-    try { await create({ startsAt: starts.toISOString(), endsAt: new Date(starts.getTime() + duration * 60_000).toISOString(), activity, departureId: station }, usingDemo); router.replace('/outing'); }
+    try { const personName = (person ?? name).trim(); await saveName(personName); await create({ startsAt: starts.toISOString(), endsAt: new Date(starts.getTime() + duration * 60_000).toISOString(), activity, departureId: station }, personName); router.replace('/outing'); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'La sortie n’a pas pu être créée. Vérifie ta connexion puis réessaie.'); }
     finally { setBusy(false); }
   }
@@ -53,9 +53,9 @@ export default function Create() {
     <Text style={ui.body}>{['Le bon moment, c’est celui où vous êtes ensemble.', 'Les grandes soirées commencent souvent par un petit verre.', 'Une station suffit. Pas besoin de ton adresse.'][step]}</Text>
     {step === 0 && <View style={{ gap: 24 }}><View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>{['Aujourd’hui', 'Demain', 'Ce week-end'].map((label, i) => <Chip key={label} selected={day === parisParts(new Date(Date.now() + (i === 2 ? ((6 - new Date().getDay() + 7) % 7 || 7) : i) * 86400_000)).day} onPress={() => setDay(parisParts(new Date(Date.now() + (i === 2 ? ((6 - new Date().getDay() + 7) % 7 || 7) : i) * 86400_000)).day)}>{label}</Chip>)}</View><Field label="Date (AAAA-MM-JJ)" value={day} onChangeText={setDay} /><Field label="Heure de Paris (HH:MM)" value={time} onChangeText={setTime} /><View style={{ gap: 10 }}><Text style={ui.label}>On prévoit de rester…</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>{[90, 150, 240].map(d => <Chip key={d} selected={duration === d} onPress={() => setDuration(d)}>{d === 90 ? '1 h 30' : d === 150 ? '2 h 30' : '4 h'}</Chip>)}</View></View></View>}
     {step === 1 && <View style={{ gap: 12 }}>{([{ kind: 'drinks', Icon: GlassWater, detail: 'Un toast à la fin de la journée.' }, { kind: 'dinner', Icon: Utensils, detail: 'Une table et du temps pour discuter.' }, { kind: 'coffee', Icon: Coffee, detail: 'Une pause qui fait du bien.' }, { kind: 'other', Icon: Sparkles, detail: 'L’important, c’est de se retrouver.' }] as const).map(({ kind, Icon, detail }) => <Pressable key={kind} accessibilityRole="button" accessibilityState={{ selected: activity === kind }} onPress={() => setActivity(kind)} style={{ ...ui.row, padding: 22, borderRadius: 16, borderWidth: 1, borderColor: activity === kind ? colors.blue : colors.border, backgroundColor: activity === kind ? '#EDF1FF' : 'white' }}><Icon size={25} color={activity === kind ? colors.blue : colors.muted} /><View style={{ gap: 4 }}><Text style={{ color: colors.ink, fontSize: 17, fontWeight: '600' }}>{activityLabels[kind]}</Text><Text style={ui.body}>{detail}</Text></View></Pressable>)}</View>}
-    {step === 2 && <View style={{ gap: 24 }}><StationPicker stations={stations} value={station} onChange={setStation} /><Notice>Seul le nom de ta station sera partagé avec le groupe.</Notice>{!userId && supabase && <View style={{ gap: 10 }}><Text style={ui.body}>Connecte-toi pour inviter tes amis sur leurs téléphones.</Text><SignInButtons onError={setError} /></View>}{userId && <View style={{ flexDirection: 'row', gap: 10 }}><Chip selected={!usingDemo} onPress={() => setDemo(false)}>Sortie partagée</Chip><Chip selected={usingDemo} onPress={() => setDemo(true)}>Essai local</Chip></View>}{usingDemo && <Notice warning>Les lieux sont réels. Les trajets sont simulés et la sortie reste sur cet appareil.</Notice>}</View>}
+    {step === 2 && <View style={{ gap: 24 }}><Field label="Ton prénom" value={person ?? name} onChangeText={setPerson} maxLength={40} /><StationPicker stations={stations} value={station} onChange={setStation} /><Notice>Seuls ton prénom et le nom de ta station seront partagés avec le groupe.</Notice>{!supabase && <Notice warning>Le service n’est pas configuré sur cette version de l’application.</Notice>}{supabase && !userId && <Notice warning={sessionFailed}>{sessionFailed ? 'Le service est injoignable. Vérifie ta connexion internet, on réessaie tout seuls.' : 'On prépare ta session…'}</Notice>}</View>}
     {!!error && <Notice warning>{error}</Notice>}
-    {!usingDemo && <Notice warning={!coverage?.ready}>{coverage?.ready ? 'Les trajets seront vérifiés avec Île-de-France Mobilités.' : coverage === null ? 'On vérifie le service de trajets…' : 'La recherche automatique de lieu est en pause. Tu peux créer la sortie et inviter tes amis. Après la création, choisis une station de rendez-vous et un lieu.'}</Notice>}
-    <View style={{ marginTop: 10 }}><Button testID="wizard-next" loading={busy} onPress={() => void next()}>{step === 2 ? 'Créer ma sortie' : 'Suivant'}</Button></View>
+    {!!userId && <Notice warning={!coverage?.ready}>{coverage?.ready ? 'Les trajets seront vérifiés avec Île-de-France Mobilités.' : coverage === null ? 'On vérifie le service de trajets…' : 'La recherche automatique de lieu est en pause. Tu peux créer la sortie et inviter tes amis. Après la création, choisis une station de rendez-vous et un lieu.'}</Notice>}
+    <View style={{ marginTop: 10 }}><Button testID="wizard-next" loading={busy} disabled={step === 2 && !userId} onPress={() => void next()}>{step === 2 ? 'Créer ma sortie' : 'Suivant'}</Button></View>
   </View></Shell>;
 }

@@ -29,6 +29,7 @@ try {
   }
   sql(readFileSync('tests/database/assertions.sql', 'utf8'));
   sql(readFileSync('tests/database/manual.sql', 'utf8'));
+  sql(readFileSync('tests/database/quota.sql', 'utf8'));
   console.info(
     'Tests PostgreSQL/PostGIS réussis : RLS, quotas, caches, concurrence, invitations et vérification des retours.',
   );

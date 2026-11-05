@@ -4,7 +4,6 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./demo": "./src/demo.ts",
     "./calendar": "./src/calendar.ts",
     "./database": "./src/generated/database.ts"
   },

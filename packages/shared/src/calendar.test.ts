@@ -13,9 +13,8 @@ it('exports the confirmed meeting in UTC with escaped text and a stable event id
   expect(text).not.toContain(outing.inviteCode);
   expect(calendarEvent(outing, venue).startDate.getTime()).toBe(Date.parse(outing.startsAt));
 });
-it('rejects an unconfirmed venue and explicitly labels preview events', () => {
+it('rejects an unconfirmed venue', () => {
   expect(() => calendarEvent({ ...outing, confirmedVenueId: null }, venue)).toThrow();
-  expect(calendarEvent({ ...outing, mode: 'demo' }, venue).title).toContain('[Essai]');
 });
 it('folds long accented lines at 75 UTF-8 octets without breaking Unicode', () => {
   const text = outingCalendarFile(outing, { ...venue, name: 'É'.repeat(120) });

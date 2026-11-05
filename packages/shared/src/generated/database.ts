@@ -159,6 +159,20 @@ isOneToOne: true
                   Relationships: [
                     
                   ]
+                },"prim_user_usage": {
+                  Row: {
+                    "calls": number,"usage_day": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "calls"?: number,"usage_day": string,"user_id": string
+                  }
+                  Update: {
+                    "calls"?: number,"usage_day"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"stations": {
                   Row: {
                     "active": boolean,"id": string,"latitude": number,"lines": NonNullable<Json>,"longitude": number,"name": string,"position": unknown
@@ -281,6 +295,9 @@ isOneToOne: false
                            },
 "reserve_prim_call":
 { Args: { "api_name": string,"daily_limit": number }; Returns: boolean
+                           },
+"reserve_prim_user_call":
+{ Args: { "daily_limit": number,"requester": string,"user_limit": number }; Returns: boolean
                            },
 "resolve_invite_code":
 { Args: { "short_code": string }; Returns: string

@@ -13,7 +13,7 @@ export default function LiveVenueMap(
   const [unavailable, setUnavailable] = useState(false);
   const topic = locationTopic(outing);
   useFocusEffect(useCallback(() => {
-    if (!supabase || outing.mode !== 'live' || !outing.confirmedVenueId) return;
+    if (!supabase || !outing.confirmedVenueId) return;
     const client = supabase;
     let channel: ReturnType<typeof client.channel> | null = null;
     const unsubscribe = () => {
@@ -60,7 +60,7 @@ export default function LiveVenueMap(
       listener.remove();
       unsubscribe();
     };
-  }, [topic, outing.mode, outing.confirmedVenueId]));
+  }, [topic, outing.confirmedVenueId]));
   return (
     <View style={{ gap: 8 }}>
       <VenueMap stations={stations} venues={venues} positions={positions} />
