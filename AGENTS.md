@@ -8,7 +8,7 @@ Onyva est une application Expo iOS et Android qui cherche un lieu de rencontre �
 
 1. L’application parle à Supabase.
 2. Supabase fournit PostgreSQL, PostGIS, Auth anonyme avec Apple et Google facultatifs, Realtime, les Edge Functions et pg_cron.
-3. Les Edge Functions utilisent le calculateur Navitia de PRIM. La clé reste côté serveur. Aucun serveur de routage ni VM n’est nécessaire.
+3. Transition en cours : les trajets passent de PRIM/Navitia à un moteur maison alimenté par le GTFS IDFM (décision du 6 novembre 2026, voir `docs/engine.md`). Le moteur est un service Node sans état, appelé uniquement par l’Edge Function `recommend` avec un secret partagé. Il peut tourner sur une VM, Oracle Cloud Always Free pour le MVP, sans aucun service payant. PRIM reste le fournisseur actif jusqu’au branchement du moteur.
 4. Une tâche GitHub Actions hebdomadaire importe les lieux depuis l’extrait régional OpenStreetMap, sans Overpass.
 
 Tout doit rester gratuit au départ. Ne jamais ajouter un service payant, une facturation à l’usage ou un dépassement automatique sans accord explicite. Le dépassement d’un quota bloque le service concerné avec un message clair. La gratuité n’est pas une promesse de capacité illimitée.
@@ -21,9 +21,11 @@ Monorepo pnpm workspaces, TypeScript strict, sans Turborepo.
 apps/
   mobile/                  Expo Router, NativeWind, MapLibre
   invite/                  Page statique, invitations et liens vers les boutiques
+  engine/                  Prévu : service HTTP du moteur, sans état, Docker multi-architecture
 packages/
   shared/                  Schémas Zod, types, contrats et types Supabase générés
   fairness/                Règles pures : minimax, présélection et validation des retours
+  transit-engine/          Prévu : compilation GTFS, instantané binaire, RAPTOR, sans réseau ni base
 supabase/
   migrations/              Migrations SQL versionnées, source de vérité de la base
   functions/
@@ -34,13 +36,14 @@ supabase/
     _shared/               Adaptateurs et orchestration testables
 scripts/
   venues/                  Extraction OSM régionale et import hebdomadaire
-  import-stations.ts       Catalogue de stations PRIM
+  import-stations.ts       Catalogue de stations PRIM, remplacé par scripts/engine/ à terme
+  engine/                  Prévu : build-network, bench et import des stations depuis le GTFS
   generate-db-types.mjs     Génération des types depuis Supabase
 tests/
   database/                RLS, quotas, concurrence et PostGIS
 ```
 
-L’ancien moteur maison est documenté comme plan B dans `docs/plan-b.md`. Il ne fait pas partie du runtime ni des dépendances actives.
+Le moteur maison est documenté dans `docs/engine.md`, phase par phase. `docs/plan-b.md` est une note d’historique.
 
 ## Commandes
 
@@ -64,6 +67,10 @@ pnpm test:database                # PostgreSQL/PostGIS isolé dans le conteneur 
 pnpm test:e2e
 # Test distant explicite avec comptes temporaires et jusqu’à 20 appels gratuits :
 ONYVA_LIVE_TEST_CONFIRMED=true pnpm test:manual
+# Prévu avec le moteur maison :
+pnpm engine:build-network         # GTFS IDFM vers instantané binaire
+pnpm engine:dev                   # service moteur local
+pnpm engine:bench                 # mémoire et latences sur le GTFS réel
 ```
 
 Avant de terminer : `pnpm lint`, `pnpm typecheck` et `pnpm test` doivent passer. Exécuter aussi les tests SQL si les migrations ou les règles de sécurité changent. Ne jamais modifier une migration déjà appliquée pour faire évoluer le schéma. Ajouter une migration, puis régénérer les types. Ne pas réintroduire Drizzle.
@@ -119,7 +126,8 @@ Vitest couvre les règles pures, les réponses PRIM enregistrées quand une clé
 
 ## Données et déploiement
 
-- PRIM Navitia : itinéraires, isochrones tabulaires et perturbations, cache court, clé en variables serveur. Quota gratuit à confirmer dans le compte PRIM avant activation.
+- GTFS IDFM : horaires théoriques sur environ 30 jours, Licence Mobilités, attribution Île-de-France Mobilités. Source, mesures et contrat du moteur dans `docs/engine.md`.
+- PRIM Navitia, en transition : itinéraires, isochrones tabulaires et perturbations, cache court, clé en variables serveur. Retiré après validation du moteur en production.
 - OpenStreetMap : extrait régional PBF téléchargé une fois par semaine depuis Geofabrik. Une extraction locale des bars, restaurants et cafés conserve horaires et cuisines documentés. Aucune requête Overpass ni appel par établissement.
 - PostGIS cherche les lieux à cinq minutes de marche estimée d’une station ; l’itinéraire détaillé valide la marche finale. Horaires inconnus exclus. Attribution OSM/ODbL conservée.
 - Aucun secret ni position dans le code ou les logs. Variables documentées dans `.env.example`.
