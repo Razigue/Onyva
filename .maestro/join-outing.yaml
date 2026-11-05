@@ -1,0 +1,15 @@
+appId: fr.onyva.app
+---
+# Run on a second, already signed-in development device with a fresh live code.
+# maestro test -e INVITE_CODE=... -e GUEST_NAME=Ines .maestro/join-outing.yaml
+- launchApp
+- openLink: "onyva://join?code=${INVITE_CODE}"
+- assertVisible: "Il y a une place pour toi."
+- tapOn: "Ton prénom"
+- inputText: "${GUEST_NAME}"
+- tapOn: "Ta station de départ : Choisir"
+- tapOn: "Rechercher une station"
+- inputText: "Bastille"
+- tapOn: "Bastille"
+- tapOn: "Je rejoins la bande"
+- assertVisible: "La bande"
