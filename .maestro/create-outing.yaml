@@ -1,0 +1,17 @@
+appId: fr.onyva.app
+---
+- launchApp:
+    clearState: true
+- tapOn: "On organise ça"
+- tapOn:
+    id: "wizard-next"
+- tapOn:
+    id: "wizard-next"
+- tapOn:
+    id: "wizard-next"
+- assertVisible: "Il ne manque qu’un ami."
+- tapOn: "Ajouter un ami"
+- tapOn: "Son prénom"
+- inputText: "Ines"
+- tapOn: "Ajouter au groupe"
+- assertVisible: "Le plus équilibré"
