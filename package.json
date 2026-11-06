@@ -23,7 +23,9 @@
     "test:database": "tsx tests/database/live.test.ts",
     "test:location": "tsx tests/location-http.ts",
     "prim:record": "tsx scripts/record-prim.ts",
-    "test:manual": "tsx scripts/check-manual-live.ts"
+    "test:manual": "tsx scripts/check-manual-live.ts",
+    "engine:build-network": "tsx scripts/engine/build-network.ts",
+    "engine:bench": "node --expose-gc --import tsx scripts/engine/bench.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.12",
@@ -40,7 +42,8 @@
     "vitest": "^3.2.4",
     "tsx": "^4.20.6",
     "opening_hours": "^3.15.0",
-    "@onyva/shared": "workspace:*"
+    "@onyva/shared": "workspace:*",
+    "@onyva/transit-engine": "workspace:*"
   },
   "type": "module"
 }
