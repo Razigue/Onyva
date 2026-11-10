@@ -53,3 +53,80 @@ Aucune VM ni prestation payante n’a été ajoutée. Voir [la configuration](li
 Le test `test:manual` a réussi contre le projet distant : données privées avant adhésion, aperçu et résolution du code court, adhésion d’un second compte, choix d’un lieu OSM ouvert, vérification PRIM à deux puis dix participants et confirmation visible par l’invité. Les quatre premiers trajets ont été réutilisés après ajout de huit participants. Les deux comptes de test et leurs données ont été supprimés. Aucune notification n’a été envoyée.
 
 Temps observés : 2,443 s à deux et 3,457 s à dix avec quatre trajets déjà frais. Les tests SQL couvrent la sélection réservée à l’organisateur, l’exclusion des lieux fermés ou trop éloignés et le rejet des anciens résultats après changement de groupe. Les tests navigateur couvrent la confirmation manuelle sans label d’optimum. Une validation physique reste nécessaire pour GPS, notifications et installation.
+
+## Check-list à deux téléphones
+
+À remplir à la main pendant un vrai test, sans rien déduire d’un test automatique. Indique « OK », « KO » ou « non testé », avec une note courte en cas d’écart. Préparation : [avoir Onyva dans la main](mise-en-main.md).
+
+| Champ | Valeur |
+| --- | --- |
+| Date du test | |
+| Build EAS (lien ou numéro) | |
+| Téléphone A (organisateur) : modèle, version d’Android | |
+| Téléphone B (invité) : modèle, version d’Android | |
+| Réseau (Wi-Fi, 4G, 5G) | |
+
+### Session et compte
+
+| # | Vérification | A | B | Notes |
+| --- | --- | --- | --- | --- |
+| 1 | Premier lancement : seul le prénom est demandé, aucune connexion imposée | | | |
+| 2 | Relier un compte Google depuis « Mon compte », puis le retrouver après réinstallation | | | |
+| 3 | Refus ou annulation de la connexion Google : message clair, l’app reste utilisable | | | |
+
+### Invitation et adhésion
+
+| # | Vérification | A | B | Notes |
+| --- | --- | --- | --- | --- |
+| 4 | Création en « Suivant », « Suivant », « Créer » avec les valeurs proposées | | | |
+| 5 | Partage du lien par le partage natif ou WhatsApp | | | |
+| 6 | Adhésion par lien : l’app s’ouvre directement sur la sortie | | | |
+| 7 | Adhésion par code saisi à la main dans « Rejoindre avec un code » | | | |
+| 8 | Lien ouvert sans l’app installée : la page d’invitation montre qui invite et quand | | | |
+| 9 | Code expiré ou faux : message clair, aucune donnée de la sortie visible | | | |
+
+### Lieu, trajets et confirmation
+
+| # | Vérification | A | B | Notes |
+| --- | --- | --- | --- | --- |
+| 10 | L’organisateur choisit une station de rendez-vous et voit des lieux ouverts | | | |
+| 11 | Le lieu choisi n’affiche jamais « Le plus équilibré » | | | |
+| 12 | Les allers et retours de chacun s’affichent, durées cohérentes avec un trajet réel | | | |
+| 13 | Aucun bouton de confirmation tant que les trajets ne sont pas vérifiés | | | |
+| 14 | L’invité voit la confirmation sans relancer l’app | | | |
+| 15 | Ajout au calendrier en un geste | | | |
+
+### Notifications et hors connexion
+
+| # | Vérification | A | B | Notes |
+| --- | --- | --- | --- | --- |
+| 16 | « Me prévenir du lieu choisi » : demande de permission expliquée | | | |
+| 17 | Notification reçue à la confirmation, app fermée | | | |
+| 18 | Le toucher de la notification ouvre la sortie | | | |
+| 19 | Mode avion : la sortie courante reste lisible, avec l’heure de la dernière version | | | |
+| 20 | Retour du réseau : actualisation sans perte | | | |
+
+### Position pendant la sortie
+
+| # | Vérification | A | B | Notes |
+| --- | --- | --- | --- | --- |
+| 21 | « Je suis en route » : la permission en arrière-plan est expliquée avant la demande | | | |
+| 22 | Écran verrouillé 10 min : la carte de l’autre téléphone se met à jour | | | |
+| 23 | « Je suis arrivé » : le partage s’arrête, l’icône de localisation disparaît | | | |
+| 24 | Sans action, le partage s’arrête seul après 90 minutes | | | |
+| 25 | Carte fermée : plus aucune mise à jour reçue | | | |
+
+### Suppression
+
+| # | Vérification | A | B | Notes |
+| --- | --- | --- | --- | --- |
+| 26 | « Effacer mes données » ou « Supprimer mon compte » : confirmation demandée, puis données supprimées | | | |
+| 27 | Après suppression, l’ancien lien ne donne plus accès à la sortie | | | |
+
+### Bilan
+
+| Question | Réponse |
+| --- | --- |
+| Blocages rencontrés | |
+| Ce qui a surpris les testeurs | |
+| À corriger avant un test plus large | |
