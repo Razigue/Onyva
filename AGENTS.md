@@ -25,7 +25,7 @@ apps/
 packages/
   shared/                  Schémas Zod, types, contrats et types Supabase générés
   fairness/                Règles pures : minimax, présélection et validation des retours
-  transit-engine/          Prévu : compilation GTFS, instantané binaire, RAPTOR, sans réseau ni base
+  transit-engine/          Compilation GTFS, instantané binaire, RAPTOR, sans réseau ni base
 supabase/
   migrations/              Migrations SQL versionnées, source de vérité de la base
   functions/
@@ -37,7 +37,7 @@ supabase/
 scripts/
   venues/                  Extraction OSM régionale et import hebdomadaire
   import-stations.ts       Catalogue de stations PRIM, remplacé par scripts/engine/ à terme
-  engine/                  Prévu : build-network, bench et import des stations depuis le GTFS
+  engine/                  build-network et bench ; import des stations depuis le GTFS prévu
   generate-db-types.mjs     Génération des types depuis Supabase
 tests/
   database/                RLS, quotas, concurrence et PostGIS
@@ -67,10 +67,10 @@ pnpm test:database                # PostgreSQL/PostGIS isolé dans le conteneur 
 pnpm test:e2e
 # Test distant explicite avec comptes temporaires et jusqu’à 20 appels gratuits :
 ONYVA_LIVE_TEST_CONFIRMED=true pnpm test:manual
-# Prévu avec le moteur maison :
-pnpm engine:build-network         # GTFS IDFM vers instantané binaire
-pnpm engine:dev                   # service moteur local
+# Moteur maison, GTFS décompressé dans data/gtfs-idfm/raw :
+pnpm engine:build-network         # GTFS IDFM vers instantané binaire dans data/engine
 pnpm engine:bench                 # mémoire et latences sur le GTFS réel
+# Prévu : pnpm engine:dev           # service moteur local
 ```
 
 Avant de terminer : `pnpm lint`, `pnpm typecheck` et `pnpm test` doivent passer. Exécuter aussi les tests SQL si les migrations ou les règles de sécurité changent. Ne jamais modifier une migration déjà appliquée pour faire évoluer le schéma. Ajouter une migration, puis régénérer les types. Ne pas réintroduire Drizzle.

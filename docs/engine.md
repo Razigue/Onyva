@@ -104,7 +104,7 @@ Sémantique :
 - `arriveBy` : itinéraire qui part le plus tard possible en arrivant à `to` au plus tard à `time`. À égalité, le moins de correspondances.
 - `departAfter` : itinéraire qui arrive le plus tôt possible en partant de `from` à partir de `time`. À égalité, le moins de correspondances. Sert aux retours après la fin de soirée.
 
-Sortie par élément : `{ key, status: 'ok', journey }`, avec `journey` conforme au type `Journey` de `packages/shared` (sections marche, attente, trajet, ligne, noms d’arrêts, nuit), ou `{ key, status: 'none', reason: 'no-service' | 'too-long' | 'on-demand-only' }`. Un retour `none` exclut le lieu, comme aujourd’hui.
+Sortie par élément : `{ key, status: 'ok', journey }`, avec `journey` conforme au type `Journey` de `packages/shared` (sections marche, attente, trajet, ligne, noms d’arrêts, nuit), ou `{ key, status: 'none', reason: 'no-service' | 'on-demand-only' }`. Un trajet au-delà de la durée maximale compte comme `no-service`. Un retour `none` exclut le lieu, comme aujourd’hui.
 
 Chaque portion en transport porte aussi l’identifiant de ligne GTFS et la liste des stations traversées, pour que Supabase applique les règles de perturbation sans que le moteur dépende de PRIM. Ajout facultatif au type `Leg`, sans changement pour l’application.
 
@@ -127,23 +127,66 @@ La marche finale vers le lieu reste ajoutée côté Supabase à partir de l’es
 
 Aucun corps de requête n’est journalisé. Les journaux contiennent seulement la route, le code, la durée et l’instantané.
 
-## Structure prévue
+## Phase 1 : package `packages/transit-engine`
+
+### Contenu
+
+- `compile.ts` : lit le GTFS ligne à ligne et produit un réseau en tableaux typés. Les courses sont regroupées par ligne et suite d’arrêts, triées, puis séparées quand une course en dépasse une autre, pour garantir l’ordre exigé par RAPTOR. Calendrier résolu par jour, `calendar_dates` inclus. Heures au-delà de 24 h conservées sur le jour de service précédent. Restrictions de montée et de descente gardées par passage. Courses à fenêtre de réservation (`start_pickup_drop_off_window`) exclues entièrement.
+- `snapshot.ts` : instantané binaire (en-tête JSON, puis tableaux alignés sur 8 octets), relu sans copie. Identifiant `<format>-<12 premiers caractères du SHA-256 du zip>`.
+- `engine.ts` : RAPTOR vers l’avant pour `departAfter`, RAPTOR inversé pour `arriveBy`, RAPTOR par plage pour `oneToAll`. Jour de service selon la définition GTFS (midi moins 12 h, heure de Paris), avec les jours voisins pour les services après minuit. Passages sur réservation exclus ; quand seul un tel passage permet le trajet, la réponse vaut `on-demand-only`. Correspondance sur un même quai : 60 s. Au plus 8 correspondances et 4 h de trajet.
+- `walk.ts` : marche station vers lieu **estimée** (distance à vol d’oiseau × 1,5, à 1,2 m/s, mêmes facteurs que la recherche PostGIS), derrière une interface `PedestrianRouter` prête pour un graphe piéton.
+- Période de validité : un jour compte seulement s’il a au moins la moitié du nombre médian de courses. Le flux du 5 novembre gardait environ 5 600 courses par jour du 2 au 4 novembre, contre environ 145 000 en semaine ensuite (métro 8 absent). Validité retenue : du 5 novembre au 4 décembre 2026.
+
+### Tests
+
+- 15 tests sur des réseaux **synthétiques**, identifiés comme tels : correspondance ratée, changement sur le même quai, service après minuit, jour férié par `calendar_dates`, montée interdite, transport à la demande seul, course qui en dépasse une autre, dates hors période, jours passés partiels, `oneToAll` (attente incluse, fenêtre, cibles, cohérence avec `arriveBy`), aller-retour de l’instantané, lecture CSV et jour de service lors du changement d’heure.
+- Références indépendantes : les trois portions en transport des captures PRIM du 4 novembre 2026 (`packages/fairness/fixtures`). Le flux du 5 novembre ne décrit plus le 4 novembre en entier : chaque référence est rejouée le même jour de semaine deux semaines plus tard, le mercredi 18 novembre, en supposant un horaire régulier inchangé (**à vérifier**). Tolérance fixée à 5 minutes sur l’arrivée. Résultat : écart de 0 s sur les trois (RER C à l’aller, RER C au retour, bus 111 puis métro 8 avec une correspondance). Trois trajets ne suffisent pas à valider le moteur : de nouvelles captures PRIM datées dans la période du flux sont à faire.
+- Le test de référence est ignoré quand aucun instantané n’est compilé, notamment en CI.
+
+### Mesures du 6 novembre 2026
+
+Machine : ordinateur portable Intel Core i5-7300U, 4 cœurs, 17 Go, Node 24.15.0, x86_64. Pendant les mesures, l’application Expo, la page d’invitation et Supabase local tournaient sur la même machine (charge moyenne de 8,4 sur 4 cœurs lors de la dernière série) : les temps sont pessimistes et bruités. Ce n’est pas la VM cible.
+
+| Mesure | Résultat |
+| --- | --- |
+| Compilation du GTFS complet | 110 à 122 s, pic de mémoire 986 Mo |
+| Instantané | 87 238 600 octets : 15 406 stations, 35 484 quais, 12 699 routes RAPTOR, 400 637 courses, 8 661 900 passages, 16 courses flexibles exclues, 66 966 passages sur réservation |
+| Chargement de l’instantané | 117 à 155 ms, mémoire du processus 174 à 191 Mo après chargement |
+| Première vue d’un jour de service | 217 à 221 ms, environ 40 Mo de plus, gardée en cache (4 jours au plus) |
+| `oneToAll`, fenêtre 2 h, 10 origines × 3 | médiane 0,85 à 1,10 s, p95 2,5 à 2,7 s, 13 174 stations atteintes au plus |
+| `oneToAll`, fenêtre 4 h | médiane 2,7 à 3,1 s, p95 5,5 à 6,6 s, 14 912 stations atteintes au plus |
+| `journey` seul | médiane 16 à 24 ms, p95 55 à 68 ms |
+| Lot de 60 trajets (10 personnes, 3 lieux, aller et retour), en série | 1,3 à 1,8 s |
+| Trajets sans résultat dans le scénario | 0 |
+| Cohérence `oneToAll` et `arriveBy` sur 14 stations tirées | 14 identiques |
+
+Ces temps sont du **calcul pur** sur un seul fil. Ils n’incluent ni HTTP ni Supabase. Les plages donnent la plus basse et la plus haute de plusieurs séries.
+
+### Lecture
+
+- Pour dix personnes, `oneToAll` sur 2 h coûte environ 10 s en série sur cette machine. L’objectif de trois secondes demande le parallélisme prévu en phase 2 (un fil par cœur, instantané partagé) et une fenêtre de 2 h. Une fenêtre de 4 h triple le coût pour un gain limité : un trajet de plus de 2 h ne sert pas à choisir un lieu équitable. Proposition : fenêtre de 2 h par défaut.
+- Les trajets détaillés sont rapides : 60 trajets en 1,3 à 1,8 s en série, donc moins d’une demi-seconde sur 4 fils.
+- La mémoire tient sous 250 Mo par processus. Avec 4 fils et un instantané partagé, l’estimation est d’environ 400 à 600 Mo, **à vérifier** en phase 2. L’offre Always Free d’Oracle (ARM) suffirait largement, **à vérifier** sur la machine réelle.
+- Pistes d’optimisation non faites : arrêter la plage dès que toutes les stations utiles sont fixées, réutiliser un `oneToAll` entre participants partant de la même station, préparer les événements de départ une fois par jour de service.
+
+## Structure
 
 ```
 packages/
   transit-engine/          Compilation GTFS, instantané binaire, RAPTOR et rRAPTOR, sans réseau ni base
 apps/
-  engine/                  Service HTTP sans état, Dockerfile multi-architecture, compose.yaml
+  engine/                  Prévu (phase 2) : service HTTP sans état, Dockerfile multi-architecture, compose.yaml
 scripts/
   engine/
-    build-network.ts       GTFS vers instantané binaire versionné
+    build-network.ts       GTFS décompressé vers instantané binaire dans data/engine
     bench.ts               Mémoire, chargement, oneToAll et journey sur le GTFS réel
-    import-stations.ts     Catalogue des stations depuis le GTFS, activation atomique
+    import-stations.ts     Prévu (phase 3) : catalogue des stations depuis le GTFS
 ```
 
-Commandes prévues : `pnpm engine:build-network`, `pnpm engine:dev`, `pnpm engine:bench`.
+Commandes : `pnpm engine:build-network [dossierGtfs] [dossierSortie]`, `pnpm engine:bench [instantané] [AAAA-MM-JJ]`. Prévue en phase 2 : `pnpm engine:dev`.
 
 ## État
 
 - Phase 0 : terminée. Contrat et décisions validés le 6 novembre 2026.
-- Phases 1 à 5 : à faire. PRIM reste le fournisseur actif jusqu’à la phase 3.
+- Phase 1 : package, tests et mesures faits. En attente de validation avant la phase 2.
+- Phases 2 à 5 : à faire. PRIM reste le fournisseur actif jusqu’à la phase 3.
