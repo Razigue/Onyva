@@ -27,8 +27,8 @@ export function JourneyBars({ rows, maximum, participants, replay, estimated = f
     const value = `${estimated ? 'environ ' : ''}${minutes(row.duration)} min`;
     return <View key={row.participantId} accessible accessibilityLabel={`${person?.name} : ${estimated ? 'environ ' : ''}${minutes(row.duration)} minutes`} className="gap-1.5">
       <View className="flex-row items-center justify-between gap-3">
-        <Text className="text-small text-ink">{person?.name}</Text>
-        <Text className="text-small font-semibold text-ink" style={{ fontVariant: ['tabular-nums'] }}>{value}</Text>
+        <Text className="font-sans text-small text-ink">{person?.name}</Text>
+        <Text className="text-small font-sans-semibold text-ink" style={{ fontVariant: ['tabular-nums'] }}>{value}</Text>
       </View>
       <Bar width={Math.max(2, row.duration / Math.max(60, maximum) * 100)} color={personColors[i % personColors.length]!} delay={i * 60} replay={replay} />
     </View>;

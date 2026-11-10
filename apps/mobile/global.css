@@ -3,5 +3,5 @@
 @tailwind utilities;
 
 html, body, #root { min-height: 100%; background: theme('colors.paper.DEFAULT'); }
-body { margin: 0; }
+body { margin: 0; font-family: theme('fontFamily.sans'); }
 *:focus-visible { outline: 3px solid theme('colors.brand.DEFAULT'); outline-offset: 4px; }

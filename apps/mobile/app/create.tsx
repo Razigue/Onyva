@@ -9,6 +9,7 @@ import { WhatStep } from '../src/components/create/WhatStep';
 import { WhenStep } from '../src/components/create/WhenStep';
 import { WhereStep } from '../src/components/create/WhereStep';
 import { Button, Notice, Shell } from '../src/components/ui';
+import { tapSuccess } from '../src/lib/haptics';
 import { parisDate, parisParts } from '../src/lib/paris-time';
 import { useStore } from '../src/lib/store';
 import { supabase } from '../src/lib/supabase';
@@ -43,6 +44,7 @@ export default function Create() {
       const personName = (person ?? name).trim();
       await saveName(personName);
       await create({ startsAt: starts.toISOString(), endsAt: new Date(starts.getTime() + duration * 60_000).toISOString(), activity, departureId: station }, personName);
+      tapSuccess();
       router.replace('/outing');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'La sortie n’a pas pu être créée. Vérifie ta connexion puis réessaie.'); }
     finally { setBusy(false); }

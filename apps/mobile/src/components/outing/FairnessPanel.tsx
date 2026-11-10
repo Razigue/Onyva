@@ -17,11 +17,11 @@ export function FairnessPanel({ rows, maximum, spread, participants, replay, est
     <View accessible accessibilityLabel={summary} className="flex-row flex-wrap items-end gap-x-6 gap-y-2">
       <View className="gap-0.5">
         <Caption>Personne ne dépasse</Caption>
-        <Text className="text-display font-bold text-ink" style={{ fontVariant: ['tabular-nums'] }}>{estimated ? '≈ ' : ''}{minutes(maximum)} min</Text>
+        <Text className="text-display font-sans-bold text-ink" style={{ fontVariant: ['tabular-nums'] }}>{estimated ? '≈ ' : ''}{minutes(maximum)} min</Text>
       </View>
       <View className="gap-0.5 pb-1">
         <Caption>Écart entre vous</Caption>
-        <Text className="text-title font-semibold text-ink" style={{ fontVariant: ['tabular-nums'] }}>{estimated ? '≈ ' : ''}{minutes(spread)} min</Text>
+        <Text className="text-title font-sans-semibold text-ink" style={{ fontVariant: ['tabular-nums'] }}>{estimated ? '≈ ' : ''}{minutes(spread)} min</Text>
       </View>
     </View>
     <JourneyBars rows={rows} maximum={maximum} participants={participants} replay={replay} estimated={estimated} />

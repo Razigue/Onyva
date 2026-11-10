@@ -89,6 +89,7 @@ Use a contemporary, highly legible sans-serif for the interface, paired sparingl
 - **Interface:** `Suisse Intl` if the license is available; otherwise `Inter` as a fallback.
 - **Editorial headlines:** `Canela` if the license is available; otherwise a moderate-contrast serif such as `Georgia`.
 - Do not bundle a commercial font without checking usage rights.
+- **Shipped in the MVP:** `Inter` for the interface and `Fraunces` (semibold) for rare editorial headlines, both under the SIL Open Font License, bundled through `@expo-google-fonts` and loaded with `expo-font`. The system font takes over if loading fails. No Suisse Intl or Canela file is bundled.
 
 ### Type scale
 

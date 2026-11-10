@@ -25,7 +25,7 @@ export function ResultCard({ recommendation, index, outing, stations, best, repl
   const badge = selected ? 'Lieu confirmé' : outing.selectedVenue ? 'Lieu choisi par le groupe' : best ? 'Le plus équilibré' : `Autre idée · ${index + 1}`;
   return <Card className={cx('gap-5', best ? 'border-lime-line bg-lime-soft' : 'border-border bg-surface')}>
     <View className="flex-row items-center justify-between gap-3">
-      <View className={cx('rounded-pill px-3 py-2', best ? 'bg-lime' : 'bg-chip')}><Text className="text-caption font-semibold text-ink">{badge}</Text></View>
+      <View className={cx('rounded-pill px-3 py-2', best ? 'bg-lime' : 'bg-chip')}><Text className="text-caption font-sans-semibold text-ink">{badge}</Text></View>
       <Caption>OpenStreetMap</Caption>
     </View>
     <View className="gap-2">
@@ -36,21 +36,21 @@ export function ResultCard({ recommendation, index, outing, stations, best, repl
     {!!venue.cuisines?.length && <Body>{venue.cuisines.map(value => cuisineLabels[value]).join(' · ')}</Body>}
     {venue.kind === 'dinner' && !venue.cuisines?.length && <Body>Cuisine non renseignée</Body>}
     <Pressable accessibilityRole="link" accessibilityLabel={`Consulter les avis Google pour ${venue.name}`} onPress={onReviews} className="min-h-[44px] justify-center">
-      <Text className="text-brand">Consulter les avis Google ↗</Text><Caption>Vérifie la note et les avis avant de choisir.</Caption>
+      <Text className="font-sans text-brand">Consulter les avis Google ↗</Text><Caption>Vérifie la note et les avis avant de choisir.</Caption>
     </Pressable>
     <View className="flex-row items-start gap-3">
       <Check size={18} color={palette.success} />
       <View className="flex-1 gap-1">
-        <Text className="text-small font-medium text-ink">{`Retour vérifié pour chacun après ${formatTime(outing.endsAt)}`}</Text>
+        <Text className="text-small font-sans-medium text-ink">{`Retour vérifié pour chacun après ${formatTime(outing.endsAt)}`}</Text>
         <Caption className="leading-[18px]">{recommendation.journeys.some(j => j.inbound.night) ? 'Un trajet de retour utilise un bus de nuit.' : 'Marche, attente et correspondances incluses.'}</Caption>
       </View>
     </View>
     <Pressable accessibilityRole="button" onPress={onToggle} className="min-h-[44px] flex-row items-center justify-between gap-3">
-      <Text className="text-small font-medium text-brand">Voir les trajets aller et retour</Text><ChevronDown size={18} color={palette.brand} />
+      <Text className="text-small font-sans-medium text-brand">Voir les trajets aller et retour</Text><ChevronDown size={18} color={palette.brand} />
     </Pressable>
     {expanded && <JourneyDetails recommendation={recommendation} participants={outing.participants} stations={stations} />}
     <Pressable accessibilityRole="button" accessibilityLabel={`Ça me plaît : ${venue.name}`} aria-pressed={liked} accessibilityState={{ selected: liked, disabled: reactDisabled }} disabled={reactDisabled} onPress={onReact} className="min-h-[44px] flex-row items-center gap-3">
-      <ThumbsUp size={18} color={liked ? palette.brand : palette.muted} /><Text className={liked ? 'text-brand' : 'text-muted'}>{liked ? 'Ça me plaît !' : 'Ça me plaît'} · {votes}</Text>
+      <ThumbsUp size={18} color={liked ? palette.brand : palette.muted} /><Text className={cx('font-sans', liked ? 'text-brand' : 'text-muted')}>{liked ? 'Ça me plaît !' : 'Ça me plaît'} · {votes}</Text>
     </Pressable>
     {canConfirm && <Button secondary={!best} disabled={confirmDisabled} loading={saving} onPress={onConfirm}>{best ? 'On se retrouve ici' : 'Choisir ce lieu'}</Button>}
   </Card>;

@@ -17,13 +17,13 @@ function Sidebar({ path }: { path: string }) {
       <View className="gap-2.5">{links.map(({ href, label, Icon }) => <Link key={href} href={href} asChild>
         <Pressable className={cx('min-h-[50px] flex-row items-center gap-3 rounded-medium px-3.5', path === href ? 'bg-surface' : 'bg-transparent')}>
           <Icon size={20} color={path === href ? palette.brand : palette.muted} />
-          <Text className={cx('text-small', path === href ? 'font-semibold text-ink' : 'text-muted')}>{label}</Text>
+          <Text className={cx('text-small', path === href ? 'font-sans-semibold text-ink' : 'font-sans text-muted')}>{label}</Text>
         </Pressable>
       </Link>)}</View>
     </View>
     <View className="gap-[18px]">
       <View className="h-[3px] w-8 bg-brand" />
-      <Text className="text-subtitle text-ink">Des amis.{'\n'}Des trajets.{'\n'}Un même point.</Text>
+      <Text className="font-serif text-subtitle text-ink">Des amis.{'\n'}Des trajets.{'\n'}Un même point.</Text>
       <Caption>Pensé pour l’Île-de-France.</Caption>
     </View>
   </View>;
@@ -33,7 +33,7 @@ function TabBar({ path }: { path: string }) {
   return <View className="flex-row border-t border-border bg-paper">{links.map(({ href, label, Icon }) => <Link key={href} href={href} asChild>
     <Pressable className="flex-1 items-center gap-1 py-3">
       <Icon size={21} color={path === href ? palette.brand : palette.muted} />
-      <Text className={cx('text-[11px] font-semibold', path === href ? 'text-brand' : 'text-muted')}>{label}</Text>
+      <Text className={cx('text-[11px] font-sans-semibold', path === href ? 'text-brand' : 'text-muted')}>{label}</Text>
     </Pressable>
   </Link>)}</View>;
 }
@@ -47,9 +47,9 @@ export function Shell({ children, narrow = false }: { children: ReactNode; narro
       {desktop && <Sidebar path={path} />}
       <View className="flex-1">
         <View className={cx('min-h-[82px] flex-row items-center justify-between border-b border-border', desktop ? 'px-12' : 'px-5')}>
-          {desktop ? <View className="flex-row items-center gap-3"><MapPin size={16} color={palette.muted} /><Label>Paris & Île-de-France</Label></View> : <Link href="/"><Brand small /></Link>}
+          {desktop ? <View className="flex-row items-center gap-3"><MapPin size={16} color={palette.muted} /><Label>Paris & Île-de-France</Label></View> : <Link href="/" asChild><Pressable accessibilityRole="link" accessibilityLabel="Onyva, accueil" className="min-h-[44px] justify-center"><Brand small /></Pressable></Link>}
           <Link href="/create" asChild><Pressable accessibilityRole="button" className="min-h-[44px] flex-row items-center gap-2">
-            <Plus size={19} color={palette.brand} /><Text className="text-small font-semibold text-brand">Créer une sortie</Text>
+            <Plus size={19} color={palette.brand} /><Text className="text-small font-sans-semibold text-brand">Créer une sortie</Text>
           </Pressable></Link>
         </View>
         <ScrollView contentContainerClassName={cx('items-center pb-11', desktop ? 'p-12' : 'p-5')} keyboardShouldPersistTaps="handled">
