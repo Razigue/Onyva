@@ -1,12 +1,12 @@
 // Benchmark on the real IDFM snapshot: memory, loading, oneToAll and journeys for a ten-person scenario.
 // Usage: pnpm engine:bench [snapshot.bin] [YYYY-MM-DD]
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { cpus, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { deserializeNetwork, TransitEngine } from '@onyva/transit-engine';
 
 const dir = 'data/engine';
-const file = process.argv[2] ?? join(dir, readdirSync(dir).filter(name => name.endsWith('.bin')).sort().at(-1)!);
+const file = process.argv[2] ?? join(dir, readdirSync(dir).filter(name => name.endsWith('.bin')).sort((a, b) => statSync(join(dir, b)).mtimeMs - statSync(join(dir, a)).mtimeMs)[0]!);
 const date = process.argv[3] ?? '2026-11-13';
 const gc = (globalThis as { gc?: () => void }).gc;
 const rss = () => { gc?.(); return Math.round(process.memoryUsage().rss / 1e6); };

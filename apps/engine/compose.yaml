@@ -1,0 +1,25 @@
+# Engine service on one machine. Run from apps/engine: docker compose up -d --build
+# ENGINE_SECRET comes from apps/engine/.env (never committed). The snapshot directory is built by
+# `pnpm engine:build-network` and mounted read-only; `docker compose kill -s SIGHUP engine` reloads it.
+# The port listens on the loopback only: the HTTPS front reaching it from Supabase is set up with the deployment.
+services:
+  engine:
+    build:
+      context: ../..
+      dockerfile: apps/engine/Dockerfile
+    image: onyva-engine
+    restart: unless-stopped
+    environment:
+      ENGINE_SECRET: ${ENGINE_SECRET:?ENGINE_SECRET requis}
+      ENGINE_THREADS: ${ENGINE_THREADS:-4}
+    volumes:
+      - ${ENGINE_SNAPSHOT_DIR:-../../data/engine}:/data/engine:ro
+    ports:
+      - "127.0.0.1:8787:8787"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

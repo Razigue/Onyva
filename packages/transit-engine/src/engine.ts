@@ -7,10 +7,12 @@ const INF = 0x7fffffff, NEG = -0x7fffffff;
 export interface EngineOptions {
   /** Maximum number of vehicles minus one. */
   maxTransfers?: number;
-  /** Minimum time to change vehicle on the same platform, not described by transfers.txt. */
+  /** Minimum time to change vehicle on the same platform, not described by transfers.txt: 300 s, decided on 10 November 2026 against PRIM. */
   sameStopTransferSeconds?: number;
   /** Longest journey considered, waits included. */
   maxJourneySeconds?: number;
+  /** Default oneToAll window, validated on 6 November 2026: 2 h. Never above maxJourneySeconds. */
+  defaultWindowSeconds?: number;
 }
 export type Direction = 'arriveBy' | 'departAfter';
 export interface EngineLeg {
@@ -54,7 +56,7 @@ class Labels {
 }
 
 export class TransitEngine {
-  readonly maxTransfers: number; readonly sameStop: number; readonly maxJourney: number;
+  readonly maxTransfers: number; readonly sameStop: number; readonly maxJourney: number; readonly defaultWindow: number;
   private readonly rounds: number;
   private readonly stationLookup = new Map<string, number>();
   private readonly views = new Map<string, DayView>();
@@ -66,8 +68,9 @@ export class TransitEngine {
 
   constructor(readonly network: Network, options: EngineOptions = {}) {
     this.maxTransfers = options.maxTransfers ?? 8;
-    this.sameStop = options.sameStopTransferSeconds ?? 60;
+    this.sameStop = options.sameStopTransferSeconds ?? 300;
     this.maxJourney = options.maxJourneySeconds ?? 4 * 3600;
+    this.defaultWindow = Math.min(options.defaultWindowSeconds ?? 2 * 3600, this.maxJourney);
     this.rounds = this.maxTransfers + 1;
     network.stationIds.forEach((id, index) => this.stationLookup.set(id, index));
     const stops = network.stopStation.length, patterns = network.patternRoute.length;
@@ -386,7 +389,7 @@ export class TransitEngine {
    * Range RAPTOR: departures from the origin are processed from the latest to the earliest, labels are kept between them.
    */
   oneToAll(input: { origin: string; arriveBy: number; window?: number; targets?: string[] }): OneToAllResult {
-    const net = this.network, L = this.labels, origin = this.station(input.origin), window = Math.min(input.window ?? this.maxJourney, this.maxJourney);
+    const net = this.network, L = this.labels, origin = this.station(input.origin), window = Math.min(input.window ?? this.defaultWindow, this.maxJourney);
     const view = this.view(input.arriveBy), T = input.arriveBy - view.anchor, earliest = T - window, origins = this.platforms(origin);
     const stations = net.stationIds.length, latest = new Int32Array(stations).fill(NEG), transfers = new Int32Array(stations);
     latest[origin] = T;

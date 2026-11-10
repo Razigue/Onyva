@@ -21,7 +21,7 @@ Monorepo pnpm workspaces, TypeScript strict, sans Turborepo.
 apps/
   mobile/                  Expo Router, NativeWind, MapLibre
   invite/                  Page statique, invitations et liens vers les boutiques
-  engine/                  Prévu : service HTTP du moteur, sans état, Docker multi-architecture
+  engine/                  Service HTTP du moteur, sans état, fils parallèles, Docker multi-architecture
 packages/
   shared/                  Schémas Zod, types, contrats et types Supabase générés
   fairness/                Règles pures : minimax, présélection et validation des retours
@@ -37,7 +37,7 @@ supabase/
 scripts/
   venues/                  Extraction OSM régionale et import hebdomadaire
   import-stations.ts       Catalogue de stations PRIM, remplacé par scripts/engine/ à terme
-  engine/                  build-network et bench ; import des stations depuis le GTFS prévu
+  engine/                  build-network, bench, bench-http, record-references ; import des stations depuis le GTFS prévu
   generate-db-types.mjs     Génération des types depuis Supabase
 tests/
   database/                RLS, quotas, concurrence et PostGIS
@@ -70,7 +70,9 @@ ONYVA_LIVE_TEST_CONFIRMED=true pnpm test:manual
 # Moteur maison, GTFS décompressé dans data/gtfs-idfm/raw :
 pnpm engine:build-network         # GTFS IDFM vers instantané binaire dans data/engine
 pnpm engine:bench                 # mémoire et latences sur le GTFS réel
-# Prévu : pnpm engine:dev           # service moteur local
+pnpm engine:dev                   # service moteur local, ENGINE_SECRET requis
+pnpm engine:bench-http            # latences HTTP d’un service lancé
+pnpm engine:record-references     # 20 captures PRIM de référence, --dry-run sans appel
 ```
 
 Avant de terminer : `pnpm lint`, `pnpm typecheck` et `pnpm test` doivent passer. Exécuter aussi les tests SQL si les migrations ou les règles de sécurité changent. Ne jamais modifier une migration déjà appliquée pour faire évoluer le schéma. Ajouter une migration, puis régénérer les types. Ne pas réintroduire Drizzle.

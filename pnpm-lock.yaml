@@ -57,6 +57,22 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.19.2)(jiti@1.21.7)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
 
+  apps/engine:
+    dependencies:
+      '@onyva/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@onyva/transit-engine':
+        specifier: workspace:*
+        version: link:../../packages/transit-engine
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      esbuild:
+        specifier: 0.25.12
+        version: 0.25.12
+
   apps/invite:
     dependencies:
       '@onyva/shared':

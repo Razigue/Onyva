@@ -76,9 +76,9 @@ La marche finale de la station au lieu reste une estimation tant qu’aucun grap
 
 Trois appels réels, chacun réservé dans le compteur PRIM partagé. `GET /marketplace/disruptions_bulk/disruptions/v2` répond 200 en 182 ms, 1 338 999 octets : 864 perturbations, 734 lignes touchées, champ `lastUpdatedDate`. Les 734 identifiants de lignes (`line:IDFM:<id>`) correspondent aux `route_id` du GTFS en retirant `line:`. Les tronçons (`impactedSections`) utilisent les identifiants de stations du catalogue. Répartition observée : causes 510 travaux, 302 perturbations, 52 informations ; gravités 385 `PERTURBEE`, 383 `BLOQUANTE`, 96 `INFORMATION`. Périodes au format `AAAAMMJJTHHMMSS`, fuseau **à vérifier** (Paris supposé). `GET /marketplace/v2/navitia/line_reports` répond aussi (200, 136 ms) mais ne renvoyait aucune perturbation à cet instant. Ces mesures ponctuelles ne sont ni une médiane ni un p95.
 
-## Contrat proposé pour le service moteur
+## Contrat du service moteur
 
-Proposition à valider avant d’écrire le moteur. Les schémas Zod iront dans `packages/shared/src/engine.ts`, validés par le service et par l’Edge Function.
+Contrat validé le 6 novembre 2026, fenêtre ajustée le 10 novembre. Les schémas Zod sont dans `packages/shared/src/engine.ts` (`@onyva/shared/engine`), validés par le service et, en phase 3, par l’Edge Function.
 
 ### Conventions
 
@@ -86,11 +86,11 @@ Proposition à valider avant d’écrire le moteur. Les schémas Zod iront dans 
 - Stations au format du catalogue, `stop_area:IDFM:<n>`. Aucune adresse, aucune position, aucun identifiant de sortie ni d’utilisateur.
 - Chaque réponse porte `snapshot` : identifiant de l’instantané (empreinte du flux), utilisé dans les clés de cache côté Supabase.
 - Départ d’une station : on peut monter à n’importe quel quai de la station sans temps d’accès. Hypothèse **à vérifier** contre les références ; un temps d’accès par défaut pourra être ajouté.
-- Durée maximale d’un trajet : 4 h. Correspondances maximales : 8. Valeurs **à vérifier** au banc d’essai.
+- Durée maximale d’un trajet : 4 h. Correspondances maximales : 8. Correspondance sur un même quai : 300 s depuis le 10 novembre 2026 (voir phase 2). Valeurs par défaut retenues pour le MVP, à ajuster avec de nouvelles références.
 
 ### `POST /v1/one-to-all`
 
-Entrée : `{ origin, arriveBy, window, targets? }`, avec `window` en secondes (par défaut 4 h, maximum 6 h) et `targets` facultatif (liste de stations, 20 000 au plus).
+Entrée : `{ origin, arriveBy, window?, targets? }`, avec `window` en secondes (par défaut 2 h, maximum 4 h, décision du 10 novembre 2026) et `targets` facultatif (liste de stations, 20 000 au plus, dans la limite de 256 Ko par corps). Le maximum suit la durée maximale d’un trajet : une fenêtre plus large ne trouverait rien de plus.
 
 Sémantique : pour chaque station cible `s`, `latestDeparture(s)` est la dernière heure de départ depuis `origin`, comprise dans `[arriveBy - window, arriveBy]`, qui permet d’atteindre `s` au plus tard à `arriveBy`. La durée renvoyée vaut `arriveBy - latestDeparture(s)` : elle inclut la marche, l’attente au départ et aux correspondances, et l’éventuelle avance à l’arrivée. Calcul par RAPTOR par plage (rRAPTOR) sur les départs de l’origine, du plus tardif au plus précoce. Résultat sur l’offre théorique, présenté comme tel, jamais comme une garantie.
 
@@ -123,9 +123,11 @@ La marche finale vers le lieu reste ajoutée côté Supabase à partir de l’es
 | 413 | Corps au-delà de 256 Ko ou lot au-delà de 64 éléments |
 | 422 | Date hors de la période de validité, avec `validFrom` et `validUntil` dans la réponse. Jamais de calcul implicite « pour maintenant » |
 | 503 | Instantané non chargé ou rechargement en échec sans version précédente |
-| 504 | Délai maximal dépassé, 5 s par requête, **à vérifier** au banc d’essai |
+| 504 | Délai maximal dépassé, 5 s par requête, attente dans la file comprise |
 
-Aucun corps de requête n’est journalisé. Les journaux contiennent seulement la route, le code, la durée et l’instantané.
+Aucun corps de requête n’est journalisé. Les journaux contiennent seulement la route (`other` pour une route inconnue), le code, la durée et l’instantané.
+
+Authentification : `Authorization: Bearer <ENGINE_SECRET>`, comparaison en temps constant sur les empreintes SHA-256. `/health` reste sans jeton pour la surveillance et ne renvoie que l’identifiant de l’instantané. Les réponses de plus de 1 Ko sont compressées en gzip quand le client l’accepte.
 
 ## Phase 1 : package `packages/transit-engine`
 
@@ -133,7 +135,7 @@ Aucun corps de requête n’est journalisé. Les journaux contiennent seulement 
 
 - `compile.ts` : lit le GTFS ligne à ligne et produit un réseau en tableaux typés. Les courses sont regroupées par ligne et suite d’arrêts, triées, puis séparées quand une course en dépasse une autre, pour garantir l’ordre exigé par RAPTOR. Calendrier résolu par jour, `calendar_dates` inclus. Heures au-delà de 24 h conservées sur le jour de service précédent. Restrictions de montée et de descente gardées par passage. Courses à fenêtre de réservation (`start_pickup_drop_off_window`) exclues entièrement.
 - `snapshot.ts` : instantané binaire (en-tête JSON, puis tableaux alignés sur 8 octets), relu sans copie. Identifiant `<format>-<12 premiers caractères du SHA-256 du zip>`.
-- `engine.ts` : RAPTOR vers l’avant pour `departAfter`, RAPTOR inversé pour `arriveBy`, RAPTOR par plage pour `oneToAll`. Jour de service selon la définition GTFS (midi moins 12 h, heure de Paris), avec les jours voisins pour les services après minuit. Passages sur réservation exclus ; quand seul un tel passage permet le trajet, la réponse vaut `on-demand-only`. Correspondance sur un même quai : 60 s. Au plus 8 correspondances et 4 h de trajet.
+- `engine.ts` : RAPTOR vers l’avant pour `departAfter`, RAPTOR inversé pour `arriveBy`, RAPTOR par plage pour `oneToAll`. Jour de service selon la définition GTFS (midi moins 12 h, heure de Paris), avec les jours voisins pour les services après minuit. Passages sur réservation exclus ; quand seul un tel passage permet le trajet, la réponse vaut `on-demand-only`. Correspondance sur un même quai : 60 s à l’origine, 300 s depuis la phase 2. Au plus 8 correspondances et 4 h de trajet.
 - `walk.ts` : marche station vers lieu **estimée** (distance à vol d’oiseau × 1,5, à 1,2 m/s, mêmes facteurs que la recherche PostGIS), derrière une interface `PedestrianRouter` prête pour un graphe piéton.
 - Période de validité : un jour compte seulement s’il a au moins la moitié du nombre médian de courses. Le flux du 5 novembre gardait environ 5 600 courses par jour du 2 au 4 novembre, contre environ 145 000 en semaine ensuite (métro 8 absent). Validité retenue : du 5 novembre au 4 décembre 2026.
 
@@ -169,24 +171,71 @@ Ces temps sont du **calcul pur** sur un seul fil. Ils n’incluent ni HTTP ni Su
 - La mémoire tient sous 250 Mo par processus. Avec 4 fils et un instantané partagé, l’estimation est d’environ 400 à 600 Mo, **à vérifier** en phase 2. L’offre Always Free d’Oracle (ARM) suffirait largement, **à vérifier** sur la machine réelle.
 - Pistes d’optimisation non faites : arrêter la plage dès que toutes les stations utiles sont fixées, réutiliser un `oneToAll` entre participants partant de la même station, préparer les événements de départ une fois par jour de service.
 
+## Phase 2 : service `apps/engine`
+
+### Contenu
+
+- `server.ts` : `node:http`, sans framework. Routes `GET /health`, `GET /v1/meta`, `POST /v1/one-to-all`, `POST /v1/journeys`, codes d’erreur du contrat. Validation Zod de chaque corps.
+- `pool.ts` et `worker.ts` : un fil `worker_threads` par cœur (4 au plus par défaut), une file commune, une tâche à la fois par fil. L’instantané est copié une fois dans un `SharedArrayBuffer` : tous les fils lisent la même mémoire. Un lot de trajets est réparti sur tous les fils, dans l’ordre de la requête. Une tâche au-delà du délai est retirée de la file, ou son fil est arrêté puis remplacé, car une recherche RAPTOR ne s’interrompt pas de l’extérieur.
+- `main.ts` : configuration par variables d’environnement (`.env.example`). `SIGHUP` recharge l’instantané le plus récent du dossier : le nouveau pool est prêt avant de remplacer l’ancien, qui termine ses tâches puis s’arrête. Un rechargement raté garde l’instantané en service. `SIGTERM` arrête proprement.
+- `Dockerfile` : bundle esbuild construit une seule fois sur la machine de build, image `node:24.15.0-bookworm-slim` pour `linux/amd64` et `linux/arm64`, utilisateur `node`. L’instantané n’est jamais dans l’image : il est monté en lecture seule sur `/data/engine`. `compose.yaml` : système de fichiers en lecture seule, aucune capacité, mémoire limitée à 1 Go, port publié sur la boucle locale seulement. Le frontal HTTPS joignable depuis Supabase est prévu avec le déploiement.
+- Tests : 9 tests du service sur un réseau **synthétique** (jeton, codes 400, 401, 404, 413, 422, 503, ordre des lots, compression, journaux sans corps) et un test de délai avec un fil qui ne répond jamais.
+
+### Références PRIM du 10 novembre 2026
+
+20 trajets réels capturés le 10 novembre 2026 par `pnpm engine:record-references`, de station à station, sur les horaires théoriques, pour des dates du 12 au 20 novembre. 20 appels réservés dans le compteur PRIM partagé, latence PRIM de 181 à 1 884 ms (mesures ponctuelles). L’extrait est dans `packages/transit-engine/fixtures/prim-references-2026-11-10.json`, les réponses brutes dans `data/prim-references` (non versionné). Les cas couvrent RER A, B et D, Transilien L, N et R, métros 4 à 9 et 14, tramway T2, bus 181, la nuit, le samedi, le dimanche, un départ à 6 h, des derniers retours et trois arrivées imposées.
+
+Comparaison sur le cœur en transport de chaque trajet PRIM, de la première montée à la dernière descente, avec l’instantané compilé le même jour (flux du 10 novembre, `1-7999332c62ec`). Navitia ne renvoie pas toujours l’arrivée la plus tôt : le test vérifie que le moteur ne fait jamais plus de 5 minutes moins bien que PRIM.
+
+| Résultat | Cas |
+| --- | --- |
+| Horaires identiques à la seconde, mêmes lignes | 18 sur 20 |
+| Moteur plus rapide, mêmes lignes | 2 : Saint-Denis vers Massy - Palaiseau (−4 min), Cergy le Haut vers Châtelet - Les Halles (−5 min) |
+| Moteur moins bon que PRIM | 0 |
+
+Les deux écarts ont la même cause : une correspondance sur un même quai GTFS. Le moteur prend le RER B 3 min 30 après le RER D à Gare du Nord, et le RER A 1 min 45 après la ligne L à Nanterre Université. PRIM refuse ces correspondances et prend le train suivant. Avec le même quai à 240 s, 19 cas sur 20 sont identiques ; à 300 s, 20 sur 20. Décision du 10 novembre 2026 : 300 s par défaut. Vingt trajets ne prouvent pas que cette valeur convient partout : de nouvelles références restent utiles, notamment sur des correspondances quai à quai réellement courtes.
+
+### Mesures du 10 novembre 2026
+
+Même machine que la phase 1 (Intel Core i5-7300U, 4 cœurs, Node 24.15.0), cette fois sans Expo ni Supabase local, charge moyenne de 0,5 à 0,8. Service lancé avec 4 fils, appelé en HTTP local par `pnpm engine:bench-http`, scénario à dix personnes du 13 novembre. Ce n’est pas la VM cible et le réseau entre Supabase et la VM n’est pas compté.
+
+| Mesure | Résultat |
+| --- | --- |
+| Compilation du flux du 10 novembre | 39 s, pic de mémoire 1,07 Go |
+| Instantané | 88 250 744 octets, 15 407 stations, 407 397 courses, validité du 10 novembre au 9 décembre 2026 |
+| Démarrage du pool, 4 fils | 262 ms |
+| Dix `oneToAll` en parallèle, fenêtre de 2 h | médiane 2,8 à 3,0 s, de 2,2 à 3,5 s sur 5 séries |
+| Lot de 60 trajets réparti sur 4 fils | médiane 0,36 s, de 0,34 à 0,75 s |
+| Trajets sans résultat | 0 |
+| Mémoire du processus, 4 fils | 505 Mo après les mesures, pic 582 Mo |
+| Image Docker | 323 Mo, construite pour amd64 et arm64 |
+
+### Lecture
+
+- L’objectif d’environ trois secondes pour dix personnes est atteint de justesse en calcul pur sur 4 cœurs anciens. La latence réseau vers la VM et le temps de Supabase s’ajoutent : **à vérifier** en phase 3. Les optimisations de la phase 1 restent possibles si la VM est plus lente.
+- La mémoire tient dans l’estimation de la phase 1 et dans la limite de 1 Go du conteneur.
+
 ## Structure
 
 ```
 packages/
   transit-engine/          Compilation GTFS, instantané binaire, RAPTOR et rRAPTOR, sans réseau ni base
 apps/
-  engine/                  Prévu (phase 2) : service HTTP sans état, Dockerfile multi-architecture, compose.yaml
+  engine/                  Service HTTP sans état, fils parallèles, Dockerfile multi-architecture, compose.yaml
 scripts/
   engine/
     build-network.ts       GTFS décompressé vers instantané binaire dans data/engine
     bench.ts               Mémoire, chargement, oneToAll et journey sur le GTFS réel
+    bench-http.ts          Latences HTTP d’un service lancé, scénario à dix personnes
+    record-references.ts   20 captures PRIM de référence, réservées dans le compteur partagé
     import-stations.ts     Prévu (phase 3) : catalogue des stations depuis le GTFS
 ```
 
-Commandes : `pnpm engine:build-network [dossierGtfs] [dossierSortie]`, `pnpm engine:bench [instantané] [AAAA-MM-JJ]`. Prévue en phase 2 : `pnpm engine:dev`.
+Commandes : `pnpm engine:build-network [dossierGtfs] [dossierSortie]`, `pnpm engine:bench [instantané] [AAAA-MM-JJ]`, `pnpm engine:dev`, `pnpm engine:bench-http [AAAA-MM-JJ]`, `pnpm engine:record-references [--dry-run]`.
 
 ## État
 
 - Phase 0 : terminée. Contrat et décisions validés le 6 novembre 2026.
-- Phase 1 : package, tests et mesures faits. En attente de validation avant la phase 2.
-- Phases 2 à 5 : à faire. PRIM reste le fournisseur actif jusqu’à la phase 3.
+- Phase 1 : validée le 10 novembre 2026, fenêtre de 2 h par défaut et valeurs par défaut retenues.
+- Phase 2 : service, image Docker et 20 références PRIM faits. Même quai à 300 s, validé le 10 novembre 2026.
+- Phases 3 à 5 : à faire. PRIM reste le fournisseur actif jusqu’à la phase 3.

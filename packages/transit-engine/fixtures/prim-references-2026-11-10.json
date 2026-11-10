@@ -1,0 +1,1075 @@
+{
+  "provenance": {
+    "capturedFromPrim": true,
+    "capturedAt": "2026-11-10T15:31:07.484Z",
+    "source": "PRIM IDFM/Navitia, /v2/navitia/journeys, données théoriques (base_schedule)",
+    "license": "Licence Mobilités, Île-de-France Mobilités",
+    "description": "Extrait fidèle du premier trajet de chaque réponse : sections, stations et horaires, heure de Paris. Réponses brutes conservées localement dans data/prim-references.",
+    "snapshotAtCapture": "snapshot-1-7999332c62ec.bin",
+    "calls": 20
+  },
+  "references": [
+    {
+      "label": "RER A, heure de pointe",
+      "fromName": "Nation",
+      "toName": "La Défense",
+      "from": "stop_area:IDFM:71673",
+      "to": "stop_area:IDFM:71517",
+      "at": "2026-11-12T08:30",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 377,
+      "journey": {
+        "departure": "20261112T083015",
+        "arrival": "20261112T084649",
+        "duration": 994,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261112T083015",
+            "arrival": "20261112T083015",
+            "from": "stop_area:IDFM:71673",
+            "to": "stop_area:IDFM:71673"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261112T083015",
+            "arrival": "20261112T084649",
+            "from": "stop_area:IDFM:71673",
+            "to": "stop_area:IDFM:71517",
+            "line": "A",
+            "network": "RER"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261112T084649",
+            "arrival": "20261112T084649",
+            "from": "stop_area:IDFM:71517",
+            "to": "stop_area:IDFM:71517"
+          }
+        ]
+      }
+    },
+    {
+      "label": "RER B vers l’aéroport",
+      "fromName": "Gare du Nord",
+      "toName": "Aéroport CDG (Terminal 2) - TGV",
+      "from": "stop_area:IDFM:71410",
+      "to": "stop_area:IDFM:73699",
+      "at": "2026-11-12T07:15",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 320,
+      "journey": {
+        "departure": "20261112T071800",
+        "arrival": "20261112T075210",
+        "duration": 2050,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261112T071800",
+            "arrival": "20261112T071800",
+            "from": "stop_area:IDFM:71410",
+            "to": "stop_area:IDFM:71410"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261112T071800",
+            "arrival": "20261112T075210",
+            "from": "stop_area:IDFM:71410",
+            "to": "stop_area:IDFM:73699",
+            "line": "B",
+            "network": "RER"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261112T075210",
+            "arrival": "20261112T075210",
+            "from": "stop_area:IDFM:73699",
+            "to": "stop_area:IDFM:73699"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Banlieue nord vers banlieue sud",
+      "fromName": "Saint-Denis",
+      "toName": "Massy - Palaiseau",
+      "from": "stop_area:IDFM:72323",
+      "to": "stop_area:IDFM:63244",
+      "at": "2026-11-12T18:10",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 314,
+      "journey": {
+        "departure": "20261112T181120",
+        "arrival": "20261112T190328",
+        "duration": 3128,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261112T181120",
+            "arrival": "20261112T181120",
+            "from": "stop_area:IDFM:72323",
+            "to": "stop_area:IDFM:72323"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261112T181120",
+            "arrival": "20261112T181930",
+            "from": "stop_area:IDFM:72323",
+            "to": "stop_area:IDFM:71410",
+            "line": "D",
+            "network": "RER"
+          },
+          {
+            "type": "waiting",
+            "departure": "20261112T181930",
+            "arrival": "20261112T182600"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261112T182600",
+            "arrival": "20261112T190328",
+            "from": "stop_area:IDFM:71410",
+            "to": "stop_area:IDFM:63244",
+            "line": "B",
+            "network": "RER"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261112T190328",
+            "arrival": "20261112T190328",
+            "from": "stop_area:IDFM:63244",
+            "to": "stop_area:IDFM:63244"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Métro avec correspondance",
+      "fromName": "Bastille",
+      "toName": "Porte de Clignancourt",
+      "from": "stop_area:IDFM:463564",
+      "to": "stop_area:IDFM:478883",
+      "at": "2026-11-12T19:05",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 284,
+      "journey": {
+        "departure": "20261112T190632",
+        "arrival": "20261112T192654",
+        "duration": 1222,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261112T190632",
+            "arrival": "20261112T190632",
+            "from": "stop_area:IDFM:463564",
+            "to": "stop_area:IDFM:463564"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261112T190632",
+            "arrival": "20261112T191520",
+            "from": "stop_area:IDFM:463564",
+            "to": "stop_area:IDFM:71359",
+            "line": "5",
+            "network": "RATP"
+          },
+          {
+            "type": "transfer",
+            "mode": "walking",
+            "departure": "20261112T191520",
+            "arrival": "20261112T191707",
+            "from": "stop_area:IDFM:71359",
+            "to": "stop_area:IDFM:71359"
+          },
+          {
+            "type": "waiting",
+            "departure": "20261112T191707",
+            "arrival": "20261112T191935"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261112T191935",
+            "arrival": "20261112T192654",
+            "from": "stop_area:IDFM:71359",
+            "to": "stop_area:IDFM:478883",
+            "line": "4",
+            "network": "RATP"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261112T192654",
+            "arrival": "20261112T192654",
+            "from": "stop_area:IDFM:478883",
+            "to": "stop_area:IDFM:478883"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Métro 8 puis réseau ferré",
+      "fromName": "Créteil - Préfecture",
+      "toName": "Gare Montparnasse",
+      "from": "stop_area:IDFM:70021",
+      "to": "stop_area:IDFM:71139",
+      "at": "2026-11-12T17:40",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 330,
+      "journey": {
+        "departure": "20261112T174109",
+        "arrival": "20261112T182104",
+        "duration": 2395,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261112T174109",
+            "arrival": "20261112T174109",
+            "from": "stop_area:IDFM:70021",
+            "to": "stop_area:IDFM:70021"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261112T174109",
+            "arrival": "20261112T175849",
+            "from": "stop_area:IDFM:70021",
+            "to": "stop_area:IDFM:71614",
+            "line": "8",
+            "network": "RATP"
+          },
+          {
+            "type": "transfer",
+            "mode": "walking",
+            "departure": "20261112T175849",
+            "arrival": "20261112T180149",
+            "from": "stop_area:IDFM:71614",
+            "to": "stop_area:IDFM:71614"
+          },
+          {
+            "type": "waiting",
+            "departure": "20261112T180149",
+            "arrival": "20261112T180503"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261112T180503",
+            "arrival": "20261112T182104",
+            "from": "stop_area:IDFM:71614",
+            "to": "stop_area:IDFM:71139",
+            "line": "6",
+            "network": "RATP"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261112T182104",
+            "arrival": "20261112T182104",
+            "from": "stop_area:IDFM:71139",
+            "to": "stop_area:IDFM:71139"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Transilien N",
+      "fromName": "Versailles Chantiers",
+      "toName": "Gare Montparnasse",
+      "from": "stop_area:IDFM:63880",
+      "to": "stop_area:IDFM:71139",
+      "at": "2026-11-18T08:05",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 243,
+      "journey": {
+        "departure": "20261118T080830",
+        "arrival": "20261118T082000",
+        "duration": 690,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T080830",
+            "arrival": "20261118T080830",
+            "from": "stop_area:IDFM:63880",
+            "to": "stop_area:IDFM:63880"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261118T080830",
+            "arrival": "20261118T082000",
+            "from": "stop_area:IDFM:63880",
+            "to": "stop_area:IDFM:71139",
+            "line": "TER",
+            "network": "TER"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T082000",
+            "arrival": "20261118T082000",
+            "from": "stop_area:IDFM:71139",
+            "to": "stop_area:IDFM:71139"
+          }
+        ]
+      }
+    },
+    {
+      "label": "RER A de bout en bout",
+      "fromName": "Cergy le Haut",
+      "toName": "Châtelet - Les Halles",
+      "from": "stop_area:IDFM:66834",
+      "to": "stop_area:IDFM:474151",
+      "at": "2026-11-18T07:50",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 181,
+      "journey": {
+        "departure": "20261118T075400",
+        "arrival": "20261118T084613",
+        "duration": 3133,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T075400",
+            "arrival": "20261118T075400",
+            "from": "stop_area:IDFM:66834",
+            "to": "stop_area:IDFM:66834"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261118T075400",
+            "arrival": "20261118T082520",
+            "from": "stop_area:IDFM:66834",
+            "to": "stop_area:IDFM:70956",
+            "line": "L",
+            "network": "Transilien"
+          },
+          {
+            "type": "waiting",
+            "departure": "20261118T082520",
+            "arrival": "20261118T083145"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261118T083145",
+            "arrival": "20261118T084613",
+            "from": "stop_area:IDFM:70956",
+            "to": "stop_area:IDFM:474151",
+            "line": "A",
+            "network": "RER"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T084613",
+            "arrival": "20261118T084613",
+            "from": "stop_area:IDFM:474151",
+            "to": "stop_area:IDFM:474151"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Est vers le centre",
+      "fromName": "Marne-la-Vallée - Chessy",
+      "toName": "Opéra",
+      "from": "stop_area:IDFM:68385",
+      "to": "stop_area:IDFM:71337",
+      "at": "2026-11-18T18:20",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 298,
+      "journey": {
+        "departure": "20261118T182132",
+        "arrival": "20261118T190819",
+        "duration": 2807,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T182132",
+            "arrival": "20261118T182132",
+            "from": "stop_area:IDFM:68385",
+            "to": "stop_area:IDFM:68385"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261118T182132",
+            "arrival": "20261118T190458",
+            "from": "stop_area:IDFM:68385",
+            "to": "stop_area:IDFM:478926",
+            "line": "A",
+            "network": "RER"
+          },
+          {
+            "type": "street_network",
+            "mode": "walking",
+            "departure": "20261118T190458",
+            "arrival": "20261118T190819",
+            "from": "stop_area:IDFM:478926",
+            "to": "stop_area:IDFM:71337"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Métro 9 direct",
+      "fromName": "Pont de Sèvres",
+      "toName": "République",
+      "from": "stop_area:IDFM:70698",
+      "to": "stop_area:IDFM:71311",
+      "at": "2026-11-18T20:10",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 456,
+      "journey": {
+        "departure": "20261118T201030",
+        "arrival": "20261118T204158",
+        "duration": 1888,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T201030",
+            "arrival": "20261118T201030",
+            "from": "stop_area:IDFM:70698",
+            "to": "stop_area:IDFM:70698"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261118T201030",
+            "arrival": "20261118T204158",
+            "from": "stop_area:IDFM:70698",
+            "to": "stop_area:IDFM:71311",
+            "line": "9",
+            "network": "RATP"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T204158",
+            "arrival": "20261118T204158",
+            "from": "stop_area:IDFM:71311",
+            "to": "stop_area:IDFM:71311"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Métro 7 traversant",
+      "fromName": "La Courneuve - 8 Mai 1945",
+      "toName": "Villejuif - Louis Aragon",
+      "from": "stop_area:IDFM:73696",
+      "to": "stop_area:IDFM:70143",
+      "at": "2026-11-18T12:30",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 479,
+      "journey": {
+        "departure": "20261118T123200",
+        "arrival": "20261118T131905",
+        "duration": 2825,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T123200",
+            "arrival": "20261118T123200",
+            "from": "stop_area:IDFM:73696",
+            "to": "stop_area:IDFM:73696"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261118T123200",
+            "arrival": "20261118T131905",
+            "from": "stop_area:IDFM:73696",
+            "to": "stop_area:IDFM:70143",
+            "line": "7",
+            "network": "RATP"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T131905",
+            "arrival": "20261118T131905",
+            "from": "stop_area:IDFM:70143",
+            "to": "stop_area:IDFM:70143"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Tramway T2",
+      "fromName": "La Défense",
+      "toName": "Issy Val de Seine",
+      "from": "stop_area:IDFM:71517",
+      "to": "stop_area:IDFM:71016",
+      "at": "2026-11-18T10:15",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 212,
+      "journey": {
+        "departure": "20261118T101900",
+        "arrival": "20261118T104400",
+        "duration": 1500,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T101900",
+            "arrival": "20261118T101900",
+            "from": "stop_area:IDFM:71517",
+            "to": "stop_area:IDFM:71517"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261118T101900",
+            "arrival": "20261118T104400",
+            "from": "stop_area:IDFM:71517",
+            "to": "stop_area:IDFM:71016",
+            "line": "T2",
+            "network": "RATP"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T104400",
+            "arrival": "20261118T104400",
+            "from": "stop_area:IDFM:71016",
+            "to": "stop_area:IDFM:71016"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Métro 14 vers Orly",
+      "fromName": "Gare Saint-Lazare",
+      "toName": "Aéroport d’Orly (Terminaux 1-2-3)",
+      "from": "stop_area:IDFM:71370",
+      "to": "stop_area:IDFM:63284",
+      "at": "2026-11-18T09:40",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 345,
+      "journey": {
+        "departure": "20261118T094027",
+        "arrival": "20261118T100925",
+        "duration": 1738,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T094027",
+            "arrival": "20261118T094027",
+            "from": "stop_area:IDFM:71370",
+            "to": "stop_area:IDFM:71370"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261118T094027",
+            "arrival": "20261118T100925",
+            "from": "stop_area:IDFM:71370",
+            "to": "stop_area:IDFM:63284",
+            "line": "14",
+            "network": "RATP"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T100925",
+            "arrival": "20261118T100925",
+            "from": "stop_area:IDFM:63284",
+            "to": "stop_area:IDFM:63284"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Nuit, métro fermé",
+      "fromName": "Châtelet - Les Halles",
+      "toName": "Créteil - Préfecture",
+      "from": "stop_area:IDFM:474151",
+      "to": "stop_area:IDFM:70021",
+      "at": "2026-11-14T02:10",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 251,
+      "journey": {
+        "departure": "20261114T051857",
+        "arrival": "20261114T060300",
+        "duration": 2643,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261114T051857",
+            "arrival": "20261114T051857",
+            "from": "stop_area:IDFM:474151",
+            "to": "stop_area:IDFM:474151"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261114T051857",
+            "arrival": "20261114T052135",
+            "from": "stop_area:IDFM:474151",
+            "to": "stop_area:IDFM:73626",
+            "line": "A",
+            "network": "RER"
+          },
+          {
+            "type": "waiting",
+            "departure": "20261114T052135",
+            "arrival": "20261114T053010"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261114T053010",
+            "arrival": "20261114T053920",
+            "from": "stop_area:IDFM:73626",
+            "to": "stop_area:IDFM:73624",
+            "line": "D",
+            "network": "RER"
+          },
+          {
+            "type": "transfer",
+            "mode": "walking",
+            "departure": "20261114T053920",
+            "arrival": "20261114T054620",
+            "from": "stop_area:IDFM:73624",
+            "to": "stop_area:IDFM:73624"
+          },
+          {
+            "type": "waiting",
+            "departure": "20261114T054620",
+            "arrival": "20261114T055400"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261114T055400",
+            "arrival": "20261114T060300",
+            "from": "stop_area:IDFM:73624",
+            "to": "stop_area:IDFM:70021",
+            "line": "181",
+            "network": "Pompadour"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261114T060300",
+            "arrival": "20261114T060300",
+            "from": "stop_area:IDFM:70021",
+            "to": "stop_area:IDFM:70021"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Retour tardif du samedi",
+      "fromName": "République",
+      "toName": "Cergy le Haut",
+      "from": "stop_area:IDFM:71311",
+      "to": "stop_area:IDFM:66834",
+      "at": "2026-11-14T23:30",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 329,
+      "journey": {
+        "departure": "20261114T233244",
+        "arrival": "20261115T004140",
+        "duration": 4136,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261114T233244",
+            "arrival": "20261114T233244",
+            "from": "stop_area:IDFM:71311",
+            "to": "stop_area:IDFM:71311"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261114T233244",
+            "arrival": "20261114T234032",
+            "from": "stop_area:IDFM:71311",
+            "to": "stop_area:IDFM:71673",
+            "line": "9",
+            "network": "RATP"
+          },
+          {
+            "type": "transfer",
+            "mode": "walking",
+            "departure": "20261114T234032",
+            "arrival": "20261114T234345",
+            "from": "stop_area:IDFM:71673",
+            "to": "stop_area:IDFM:71673"
+          },
+          {
+            "type": "waiting",
+            "departure": "20261114T234345",
+            "arrival": "20261114T234954"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261114T234954",
+            "arrival": "20261115T004140",
+            "from": "stop_area:IDFM:71673",
+            "to": "stop_area:IDFM:66834",
+            "line": "A",
+            "network": "RER"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261115T004140",
+            "arrival": "20261115T004140",
+            "from": "stop_area:IDFM:66834",
+            "to": "stop_area:IDFM:66834"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Dimanche matin",
+      "fromName": "Nation",
+      "toName": "Saint-Denis",
+      "from": "stop_area:IDFM:71673",
+      "to": "stop_area:IDFM:72323",
+      "at": "2026-11-15T09:00",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 1884,
+      "journey": {
+        "departure": "20261115T090554",
+        "arrival": "20261115T093130",
+        "duration": 1536,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261115T090554",
+            "arrival": "20261115T090554",
+            "from": "stop_area:IDFM:71673",
+            "to": "stop_area:IDFM:71673"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261115T090554",
+            "arrival": "20261115T091119",
+            "from": "stop_area:IDFM:71673",
+            "to": "stop_area:IDFM:474151",
+            "line": "A",
+            "network": "RER"
+          },
+          {
+            "type": "waiting",
+            "departure": "20261115T091119",
+            "arrival": "20261115T091700"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261115T091700",
+            "arrival": "20261115T092000",
+            "from": "stop_area:IDFM:474151",
+            "to": "stop_area:IDFM:71410",
+            "line": "B",
+            "network": "RER"
+          },
+          {
+            "type": "waiting",
+            "departure": "20261115T092000",
+            "arrival": "20261115T092620"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261115T092620",
+            "arrival": "20261115T093130",
+            "from": "stop_area:IDFM:71410",
+            "to": "stop_area:IDFM:72323",
+            "line": "H",
+            "network": "Transilien"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261115T093130",
+            "arrival": "20261115T093130",
+            "from": "stop_area:IDFM:72323",
+            "to": "stop_area:IDFM:72323"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Dernier retour en semaine",
+      "fromName": "Opéra",
+      "toName": "Marne-la-Vallée - Chessy",
+      "from": "stop_area:IDFM:71337",
+      "to": "stop_area:IDFM:68385",
+      "at": "2026-11-19T23:45",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 437,
+      "journey": {
+        "departure": "20261119T235152",
+        "arrival": "20261120T003856",
+        "duration": 2824,
+        "sections": [
+          {
+            "type": "street_network",
+            "mode": "walking",
+            "departure": "20261119T235152",
+            "arrival": "20261119T235455",
+            "from": "stop_area:IDFM:71337",
+            "to": "stop_area:IDFM:478926"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261119T235455",
+            "arrival": "20261120T003856",
+            "from": "stop_area:IDFM:478926",
+            "to": "stop_area:IDFM:68385",
+            "line": "A",
+            "network": "RER"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261120T003856",
+            "arrival": "20261120T003856",
+            "from": "stop_area:IDFM:68385",
+            "to": "stop_area:IDFM:68385"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Tôt le matin, RER D",
+      "fromName": "Gare de Lyon",
+      "toName": "Melun",
+      "from": "stop_area:IDFM:73626",
+      "to": "stop_area:IDFM:61926",
+      "at": "2026-11-18T06:00",
+      "direction": "departure",
+      "status": 200,
+      "elapsedMs": 197,
+      "journey": {
+        "departure": "20261118T061600",
+        "arrival": "20261118T064300",
+        "duration": 1620,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T061600",
+            "arrival": "20261118T061600",
+            "from": "stop_area:IDFM:73626",
+            "to": "stop_area:IDFM:73626"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261118T061600",
+            "arrival": "20261118T064300",
+            "from": "stop_area:IDFM:73626",
+            "to": "stop_area:IDFM:61926",
+            "line": "R",
+            "network": "Transilien"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T064300",
+            "arrival": "20261118T064300",
+            "from": "stop_area:IDFM:61926",
+            "to": "stop_area:IDFM:61926"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Arrivée imposée, vendredi soir",
+      "fromName": "Massy - Palaiseau",
+      "toName": "Bastille",
+      "from": "stop_area:IDFM:63244",
+      "to": "stop_area:IDFM:463564",
+      "at": "2026-11-20T20:00",
+      "direction": "arrival",
+      "status": 200,
+      "elapsedMs": 301,
+      "journey": {
+        "departure": "20261120T191645",
+        "arrival": "20261120T195807",
+        "duration": 2482,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261120T191645",
+            "arrival": "20261120T191645",
+            "from": "stop_area:IDFM:63244",
+            "to": "stop_area:IDFM:63244"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261120T191645",
+            "arrival": "20261120T194619",
+            "from": "stop_area:IDFM:63244",
+            "to": "stop_area:IDFM:474151",
+            "line": "B",
+            "network": "RER"
+          },
+          {
+            "type": "transfer",
+            "mode": "walking",
+            "departure": "20261120T194619",
+            "arrival": "20261120T195119",
+            "from": "stop_area:IDFM:474151",
+            "to": "stop_area:IDFM:71264"
+          },
+          {
+            "type": "waiting",
+            "departure": "20261120T195119",
+            "arrival": "20261120T195336"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261120T195336",
+            "arrival": "20261120T195807",
+            "from": "stop_area:IDFM:71264",
+            "to": "stop_area:IDFM:463564",
+            "line": "1",
+            "network": "RATP"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261120T195807",
+            "arrival": "20261120T195807",
+            "from": "stop_area:IDFM:463564",
+            "to": "stop_area:IDFM:463564"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Arrivée imposée, vers Versailles",
+      "fromName": "Gare Saint-Lazare",
+      "toName": "Versailles Chantiers",
+      "from": "stop_area:IDFM:71370",
+      "to": "stop_area:IDFM:63880",
+      "at": "2026-11-18T19:30",
+      "direction": "arrival",
+      "status": 200,
+      "elapsedMs": 242,
+      "journey": {
+        "departure": "20261118T184922",
+        "arrival": "20261118T191900",
+        "duration": 1778,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T184922",
+            "arrival": "20261118T184922",
+            "from": "stop_area:IDFM:71370",
+            "to": "stop_area:IDFM:71370"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261118T184922",
+            "arrival": "20261118T185954",
+            "from": "stop_area:IDFM:71370",
+            "to": "stop_area:IDFM:71139",
+            "line": "13",
+            "network": "RATP"
+          },
+          {
+            "type": "transfer",
+            "mode": "walking",
+            "departure": "20261118T185954",
+            "arrival": "20261118T190354",
+            "from": "stop_area:IDFM:71139",
+            "to": "stop_area:IDFM:71139"
+          },
+          {
+            "type": "waiting",
+            "departure": "20261118T190354",
+            "arrival": "20261118T190600"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261118T190600",
+            "arrival": "20261118T191900",
+            "from": "stop_area:IDFM:71139",
+            "to": "stop_area:IDFM:63880",
+            "line": "TER",
+            "network": "TER"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261118T191900",
+            "arrival": "20261118T191900",
+            "from": "stop_area:IDFM:63880",
+            "to": "stop_area:IDFM:63880"
+          }
+        ]
+      }
+    },
+    {
+      "label": "Arrivée imposée, samedi",
+      "fromName": "Pont de Sèvres",
+      "toName": "Nation",
+      "from": "stop_area:IDFM:70698",
+      "to": "stop_area:IDFM:71673",
+      "at": "2026-11-14T21:00",
+      "direction": "arrival",
+      "status": 200,
+      "elapsedMs": 464,
+      "journey": {
+        "departure": "20261114T201800",
+        "arrival": "20261114T205932",
+        "duration": 2492,
+        "sections": [
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261114T201800",
+            "arrival": "20261114T201800",
+            "from": "stop_area:IDFM:70698",
+            "to": "stop_area:IDFM:70698"
+          },
+          {
+            "type": "public_transport",
+            "departure": "20261114T201800",
+            "arrival": "20261114T205932",
+            "from": "stop_area:IDFM:70698",
+            "to": "stop_area:IDFM:71673",
+            "line": "9",
+            "network": "RATP"
+          },
+          {
+            "type": "crow_fly",
+            "mode": "walking",
+            "departure": "20261114T205932",
+            "arrival": "20261114T205932",
+            "from": "stop_area:IDFM:71673",
+            "to": "stop_area:IDFM:71673"
+          }
+        ]
+      }
+    }
+  ]
+}
