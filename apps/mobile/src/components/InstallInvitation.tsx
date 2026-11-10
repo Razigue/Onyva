@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Modal, Platform, Text, View } from 'react-native';
+import { Modal, Platform, View } from 'react-native';
 import { router, usePathname, useRootNavigationState } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Application from 'expo-application';
 import * as Clipboard from 'expo-clipboard';
 import { inviteFromReferrer, normalizeInviteCode } from '@onyva/shared';
-import { Button, Field, Notice, ui } from './ui';
+import { Body, Button, Card, Field, Notice, Subtitle } from './ui';
 const handledKey = 'onyva:install-invite-handled';
 export function InstallInvitation() {
   const path = usePathname();
@@ -55,12 +55,12 @@ export function InstallInvitation() {
       animationType='fade'
       onRequestClose={() => setVisible(false)}
     >
-      <View style={{ flex: 1, backgroundColor: '#0006', justifyContent: 'center', padding: 24 }}>
-        <View style={{ ...ui.card, gap: 18 }}>
-          <Text style={ui.subtitle}>Tu as un code d’invitation ?</Text>
-          <Text style={ui.body}>
+      <View className="flex-1 justify-center bg-overlay p-6">
+        <Card className="gap-[18px]">
+          <Subtitle>Tu as un code d’invitation ?</Subtitle>
+          <Body>
             Colle le code copié avant l’installation, ou saisis ses 8 caractères.
-          </Text>
+          </Body>
           <Field label='Code d’invitation' value={code} onChangeText={setCode} maxLength={40} />
           <Button
             onPress={() =>
@@ -78,7 +78,7 @@ export function InstallInvitation() {
             Passer
           </Button>
           {!!error && <Notice warning>{error}</Notice>}
-        </View>
+        </Card>
       </View>
     </Modal>
   );
