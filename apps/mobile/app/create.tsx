@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { defaultStart } from '@onyva/shared';
 import type { Outing } from '@onyva/shared';
 import { StepHeader } from '../src/components/create/StepHeader';
+import { StepTransition } from '../src/components/create/StepTransition';
 import { WhatStep } from '../src/components/create/WhatStep';
 import { WhenStep } from '../src/components/create/WhenStep';
 import { WhereStep } from '../src/components/create/WhereStep';
@@ -16,6 +17,8 @@ export default function Create() {
   const { create, stations, userId, outing, coverage, name, saveName, sessionFailed } = useStore();
   const initial = parisParts(defaultStart());
   const [step, setStep] = useState(0);
+  const [direction, setDirection] = useState(1);
+  const go = (next: number) => { setDirection(next > step ? 1 : -1); setStep(next); };
   const [day, setDay] = useState(initial.day);
   const [time, setTime] = useState(initial.time);
   const [duration, setDuration] = useState(150);
@@ -32,7 +35,7 @@ export default function Create() {
     setError('');
     const starts = parisDate(day, time);
     if (!starts || starts.getTime() < Date.now()) { setError('Choisis une date et une heure à venir, à l’heure de Paris.'); return; }
-    if (step < 2) { setStep(step + 1); return; }
+    if (step < 2) { go(step + 1); return; }
     if (!stations.some(s => s.id === station)) { setError('Choisis ta station de départ.'); return; }
     if (!(person ?? name).trim()) { setError('Indique ton prénom.'); return; }
     setBusy(true);
@@ -45,10 +48,12 @@ export default function Create() {
     finally { setBusy(false); }
   }
   return <Shell narrow><View className="mb-8 gap-5">
-    <StepHeader step={step} onBack={() => step ? setStep(step - 1) : router.back()} />
-    {step === 0 && <WhenStep day={day} time={time} duration={duration} onDay={setDay} onTime={setTime} onDuration={setDuration} />}
-    {step === 1 && <WhatStep activity={activity} onChange={setActivity} />}
-    {step === 2 && <WhereStep name={person ?? name} onName={setPerson} stations={stations} station={station} onStation={setStation} configured={!!supabase} sessionReady={!!userId} sessionFailed={sessionFailed} />}
+    <StepHeader step={step} onBack={() => step ? go(step - 1) : router.back()} />
+    <StepTransition step={step} direction={direction}>
+      {step === 0 && <WhenStep day={day} time={time} duration={duration} onDay={setDay} onTime={setTime} onDuration={setDuration} />}
+      {step === 1 && <WhatStep activity={activity} onChange={setActivity} />}
+      {step === 2 && <WhereStep name={person ?? name} onName={setPerson} stations={stations} station={station} onStation={setStation} configured={!!supabase} sessionReady={!!userId} sessionFailed={sessionFailed} />}
+    </StepTransition>
     {!!error && <Notice warning>{error}</Notice>}
     {!!userId && <Notice warning={!coverage?.ready}>{coverage?.ready ? 'Les trajets seront vérifiés avec Île-de-France Mobilités.' : coverage === null ? 'On vérifie le service de trajets…' : 'La recherche automatique de lieu est en pause. Tu peux créer la sortie et inviter tes amis. Après la création, choisis une station de rendez-vous et un lieu.'}</Notice>}
     <View className="mt-2.5"><Button testID="wizard-next" loading={busy} disabled={step === 2 && !userId} onPress={() => void next()}>{step === 2 ? 'Créer ma sortie' : 'Suivant'}</Button></View>
