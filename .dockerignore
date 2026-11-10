@@ -1,0 +1,14 @@
+# Only the engine service and its workspace packages enter a build context.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!.npmrc
+!apps/engine/package.json
+!apps/engine/src
+!packages/shared/package.json
+!packages/shared/src
+!packages/transit-engine/package.json
+!packages/transit-engine/src
+**/node_modules
+**/*.test.ts

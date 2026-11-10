@@ -85,6 +85,24 @@ describe('journeys on a synthetic network', () => {
     expect(ok(e.journey({ from: id('A'), to: id('C'), time: paris(MONDAY, '07:59'), direction: 'departAfter' })).arrival).toBe(paris(MONDAY, '08:16'));
   });
 
+  it('uses 5 minutes on the same platform by default, as observed against PRIM on 10 November 2026', async () => {
+    const feed: SyntheticFeed = {
+      stations: [{ id: 'A' }, { id: 'B' }, { id: 'C' }],
+      routes: [{ id: 'R1', name: '1' }, { id: 'R2', name: '2' }],
+      trips: [
+        line('t1', 'R1', [['A1', '08:00:00'], ['B1', '08:10:00']]),
+        line('tight', 'R2', [['B1', '08:14:59'], ['C1', '08:20:00']]),
+        line('next', 'R2', [['B1', '08:15:00'], ['C1', '08:21:00']]),
+      ],
+      calendar: [weekdays],
+    };
+    const e = await engine(feed);
+    expect(e.sameStop).toBe(300);
+    expect(ok(e.journey({ from: id('A'), to: id('C'), time: paris(MONDAY, '07:59'), direction: 'departAfter' })).arrival).toBe(paris(MONDAY, '08:21'));
+    expect(ok(e.journey({ from: id('A'), to: id('C'), time: paris(MONDAY, '08:21'), direction: 'arriveBy' })).departure).toBe(paris(MONDAY, '08:00'));
+    expect(e.journey({ from: id('A'), to: id('C'), time: paris(MONDAY, '08:20'), direction: 'arriveBy' }).status).toBe('none');
+  });
+
   it('handles trips after midnight on the previous service day', async () => {
     const feed: SyntheticFeed = { stations: [{ id: 'A' }, { id: 'B' }], routes: [{ id: 'N', name: 'N1' }], trips: [line('night', 'N', [['A1', '24:30:00'], ['B1', '25:05:00']])], calendar: [weekdays] };
     const e = await engine(feed);
@@ -177,6 +195,15 @@ describe('one to all', () => {
     const result = e.oneToAll({ origin: id('A'), arriveBy: paris(MONDAY, '08:45'), window: 30 * 60, targets: [id('B'), id('C')] });
     expect(result.durations.map(entry => entry.stationId)).toEqual([id('B')]);
     expect(result.unreachable).toBe(1);
+  });
+
+  it('uses a 2 h window by default, never more than the longest journey', async () => {
+    const e = await engine(feed);
+    // C at 10:45: the 08:30 trip leaves 2 h 15 before, outside the default window.
+    const at = paris(MONDAY, '10:45');
+    expect(e.oneToAll({ origin: id('A'), arriveBy: at, targets: [id('C')] }).durations).toEqual([]);
+    expect(e.oneToAll({ origin: id('A'), arriveBy: at, window: 3 * 3600, targets: [id('C')] }).durations).toMatchObject([{ latestDeparture: paris(MONDAY, '08:30') }]);
+    expect(e.oneToAll({ origin: id('A'), arriveBy: paris(MONDAY, '12:45'), window: 6 * 3600, targets: [id('C')] }).durations).toEqual([]);
   });
 });
 

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { TransitEngine } from './engine.ts';
@@ -11,7 +11,7 @@ import { deserializeNetwork } from './snapshot.ts';
 // Tolerance: 5 minutes on the arrival. Skipped when no snapshot is compiled locally.
 const TOLERANCE = 5 * 60;
 const dir = 'data/engine';
-const file = existsSync(dir) ? readdirSync(dir).filter(name => name.endsWith('.bin')).sort().at(-1) : undefined;
+const file = existsSync(dir) ? readdirSync(dir).filter(name => name.endsWith('.bin')).sort((a, b) => statSync(join(dir, b)).mtimeMs - statSync(join(dir, a)).mtimeMs)[0] : undefined;
 const SHIFT = 14 * 86_400;
 const paris = (value: string) => Date.parse(`${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}T${value.slice(9, 11)}:${value.slice(11, 13)}:${value.slice(13, 15)}+01:00`) / 1000 + SHIFT;
 

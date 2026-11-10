@@ -25,7 +25,10 @@
     "prim:record": "tsx scripts/record-prim.ts",
     "test:manual": "tsx scripts/check-manual-live.ts",
     "engine:build-network": "tsx scripts/engine/build-network.ts",
-    "engine:bench": "node --expose-gc --import tsx scripts/engine/bench.ts"
+    "engine:bench": "node --expose-gc --import tsx scripts/engine/bench.ts",
+    "engine:dev": "pnpm --filter @onyva/engine dev",
+    "engine:bench-http": "tsx scripts/engine/bench-http.ts",
+    "engine:record-references": "tsx scripts/engine/record-references.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.12",
