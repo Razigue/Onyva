@@ -2,28 +2,29 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, Share, Text, View, useWindowDimensions } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
-import { Check, ChevronDown, Clock3, MapPin, Plus, Share2, Trash2, Users, ThumbsUp } from 'lucide-react-native';
-import { activityLabels, cuisineLabels, formatTime, venueReviewsUrl } from '@onyva/shared';
-import type { Cuisine, Recommendation } from '@onyva/shared';
-import { Button, colors, Field, Notice, Shell, StationPicker, ui } from '../src/components/ui';
+import { MapPin } from 'lucide-react-native';
+import { activityLabels, formatTime, venueReviewsUrl } from '@onyva/shared';
+import type { Cuisine } from '@onyva/shared';
 import LiveVenueMap from '../src/components/LiveVenueMap';
 import ManualVenuePicker from '../src/components/ManualVenuePicker';
-import {startTracking,stopTracking} from '../src/lib/location-task';
-import { useStore } from '../src/lib/store';
+import { CalculationProgress } from '../src/components/outing/CalculationProgress';
+import { CuisineFilter } from '../src/components/outing/CuisineFilter';
+import { EmptyGroup } from '../src/components/outing/EmptyGroup';
+import { OutingActions } from '../src/components/outing/OutingActions';
+import { OutingHeader } from '../src/components/outing/OutingHeader';
+import { ParticipantList } from '../src/components/outing/ParticipantList';
+import { ResultCard } from '../src/components/outing/ResultCard';
+import { Body, Button, Caption, cx, Notice, Shell, Subtitle, Title } from '../src/components/ui';
 import { addToCalendar } from '../src/lib/calendar';
+import { startTracking, stopTracking } from '../src/lib/location-task';
 import { disableConfirmationPush, enableConfirmationPush } from '../src/lib/notifications';
-
-const personColors = ['#2E5BFF', '#A75529', '#647632', '#7756A1', '#267479'];
-function minutes(seconds: number) { return Math.ceil(seconds / 60); }
+import { useStore } from '../src/lib/store';
+import { palette } from '../src/theme';
 
 export default function OutingScreen() {
   const store = useStore();
   const { outing, results, stations, busy, cached, error, userId, coverage } = store;
   const wide = useWindowDimensions().width >= 1150;
-  const [adding, setAdding] = useState(false);
-  const [name, setName] = useState('');
-  const [departure, setDeparture] = useState('');
-  const [returnStation, setReturnStation] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -34,15 +35,19 @@ export default function OutingScreen() {
   const availableCuisines = [...new Set(results?.recommendations.flatMap(r => r.venue.cuisines ?? []) ?? [])];
   const activeCuisine = cuisine && availableCuisines.includes(cuisine) ? cuisine : null;
   const visibleResults = results?.recommendations.filter(r => !activeCuisine || r.venue.cuisines?.includes(activeCuisine)) ?? [];
-  const mapVenues = visibleResults.map(r => r.venue);
-  if (!store.ready) return <Shell><ActivityIndicator accessibilityLabel="Chargement de ta sortie" color={colors.blue} /></Shell>;
-  if (!outing) return <Shell narrow><View style={ui.section}><Text style={ui.title}>La prochaine sortie commence ici.</Text><Text style={ui.body}>Tu n’as pas encore de sortie en cours. Invite tes amis et trouvons votre point de rencontre.</Text><Button onPress={() => router.push('/create')}>Créer une sortie</Button></View></Shell>;
+  if (!store.ready) return <Shell><ActivityIndicator accessibilityLabel="Chargement de ta sortie" color={palette.brand} /></Shell>;
+  if (!outing) return <Shell narrow><View className="mb-8 gap-5">
+    <Title>La prochaine sortie commence ici.</Title>
+    <Body>Tu n’as pas encore de sortie en cours. Invite tes amis et trouvons votre point de rencontre.</Body>
+    <Button onPress={() => router.push('/create')}>Créer une sortie</Button>
+  </View></Shell>;
   const owner = outing.ownerId === userId;
   const confirmed = results?.recommendations.find(r => r.venue.id === outing.confirmedVenueId);
   const canEdit = owner && !outing.confirmedVenueId;
-  async function action(fn: () => Promise<void>) {
+  /** Runs a user action with one shared busy and error state. Resolves to true when it succeeded. */
+  async function action(fn: () => Promise<void>): Promise<boolean> {
     setSaving(true); store.setError(null); setMessage('');
-    try { await fn(); } catch (cause) { store.setError(cause instanceof Error ? cause.message : 'Réessaie dans un instant.'); }
+    try { await fn(); return true; } catch (cause) { store.setError(cause instanceof Error ? cause.message : 'Réessaie dans un instant.'); return false; }
     finally { setSaving(false); }
   }
   async function share() {
@@ -56,66 +61,59 @@ export default function OutingScreen() {
       else { await navigator.clipboard.writeText(text); setMessage('Le message d’invitation est copié. Colle-le dans votre groupe.'); }
     } else await Share.share({ message: text });
   }
-  function venueCard(recommendation: Recommendation, index: number) {
-    const selected = recommendation.venue.id === outing?.confirmedVenueId;
-    const best = !outing?.selectedVenue && recommendation.venue.id === results?.recommendations[0]?.venue.id;
-    const votes = store.reactions.filter(r => r.venueId === recommendation.venue.id);
-    const liked = votes.some(r => r.userId === userId);
-    return <View key={recommendation.venue.id} style={{ ...ui.card, borderColor: best ? '#C8DE7E' : colors.border, backgroundColor: best ? '#FBFCF5' : 'white', gap: 20 }}>
-      <View style={ui.between}><View style={{ paddingHorizontal: 12, paddingVertical: 7, backgroundColor: best ? colors.lime : '#F0F1F3', borderRadius: 50 }}><Text style={{ fontSize: 12, fontWeight: '600', color: colors.ink }}>{selected ? 'Lieu confirmé' : outing?.selectedVenue ? 'Lieu choisi par le groupe' : best ? 'Le plus équilibré' : `Autre idée · ${index + 1}`}</Text></View><Text style={{ fontSize: 12, color: colors.muted }}>OpenStreetMap</Text></View>
-      <View style={{ gap: 7 }}><Text style={{ ...ui.subtitle, fontSize: 24 }}>{recommendation.venue.name}</Text><View style={ui.row}><MapPin size={14} color={colors.muted} /><Text style={ui.body}>{recommendation.venue.neighborhood} · {minutes(recommendation.venue.walkSeconds)} min à pied</Text></View></View>
-      {!!recommendation.venue.cuisines?.length && <Text style={ui.body}>{recommendation.venue.cuisines.map(value => cuisineLabels[value]).join(' · ')}</Text>}
-      {recommendation.venue.kind === 'dinner' && !recommendation.venue.cuisines?.length && <Text style={ui.body}>Cuisine non renseignée</Text>}
-      <Pressable accessibilityRole="link" accessibilityLabel={`Consulter les avis Google pour ${recommendation.venue.name}`} onPress={() => void action(() => Linking.openURL(venueReviewsUrl(recommendation.venue)))} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.blue }}>Consulter les avis Google ↗</Text><Text style={{ ...ui.body, fontSize: 12 }}>Vérifie la note et les avis avant de choisir.</Text></Pressable>
-      <View style={{ gap: 13 }}>{recommendation.journeys.map((journey, i) => {
-        const person = outing?.participants.find(p => p.id === journey.participantId);
-        return <View key={journey.participantId} accessible accessibilityLabel={`${person?.name} : ${minutes(journey.outbound.duration)} minutes`} style={{ gap: 7 }}><View style={ui.between}><Text style={{ fontSize: 14, color: colors.ink }}>{person?.name}</Text><Text style={{ color: colors.ink, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{minutes(journey.outbound.duration)} min</Text></View><View style={{ height: 7, borderRadius: 5, backgroundColor: '#E9EBE5' }}><View style={{ width: `${Math.max(2, journey.outbound.duration / Math.max(60, recommendation.maximum) * 100)}%`, height: 7, borderRadius: 5, backgroundColor: personColors[i % personColors.length] }} /></View></View>;
-      })}</View>
-      <View style={{ flexDirection: 'row', gap: 24, borderTopWidth: 1, borderColor: colors.border, paddingTop: 18 }}><View style={{ gap: 4 }}><Text style={{ color: colors.ink, fontSize: 21, fontWeight: '600' }}>{minutes(recommendation.maximum)} min</Text><Text style={{ color: colors.muted, fontSize: 12 }}>le trajet le plus long</Text></View><View style={{ gap: 4 }}><Text style={{ color: colors.ink, fontSize: 21, fontWeight: '600' }}>{minutes(recommendation.spread)} min</Text><Text style={{ color: colors.muted, fontSize: 12 }}>d’écart entre vous</Text></View></View>
-      <View style={{ ...ui.row, alignItems: 'flex-start' }}><Check size={18} color={colors.green} /><View style={{ flex: 1, gap: 3 }}><Text style={{ color: colors.ink, fontSize: 14, fontWeight: '500' }}>{`Un retour prévu après ${formatTime(outing!.endsAt)}`}</Text><Text style={{ ...ui.body, fontSize: 12, lineHeight: 18 }}>{recommendation.journeys.some(j => j.inbound.night) ? 'Un trajet de retour utilise un bus de nuit.' : 'Marche, attente et correspondances incluses.'}</Text></View></View>
-      <Pressable accessibilityRole="button" onPress={() => setExpanded(expanded === recommendation.venue.id ? null : recommendation.venue.id)} style={{ ...ui.between, minHeight: 44 }}><Text style={{ color: colors.blue, fontSize: 14, fontWeight: '500' }}>Voir les trajets aller et retour</Text><ChevronDown size={18} color={colors.blue} /></Pressable>
-      {expanded === recommendation.venue.id && <View style={{ gap: 18 }}>{recommendation.journeys.map(journey => <View key={journey.participantId} style={{ gap: 6 }}><Text style={{ fontWeight: '600', color: colors.ink }}>{outing?.participants.find(p => p.id === journey.participantId)?.name}</Text>{([['Aller', journey.outbound], ['Retour', journey.inbound]] as const).map(([label, trip]) => <View key={label} style={{ gap: 4 }}><Text style={{ fontSize: 13, color: colors.ink }}>{label} · {formatTime(trip.departure)} → {formatTime(trip.arrival)} · {minutes(trip.duration)} min</Text>{trip.legs.map((leg, i) => <Text key={i} style={{ fontSize: 12, color: colors.muted, lineHeight: 19 }}>{leg.mode === 'walk' ? 'À pied' : leg.mode === 'wait' ? 'Attente' : `Ligne ${leg.line}`} · {leg.fromName ?? stations.find(s => s.id === leg.from)?.name ?? recommendation.venue.name} → {leg.toName ?? stations.find(s => s.id === leg.to)?.name ?? recommendation.venue.name}</Text>)}</View>)}</View>)}</View>}
-      <Pressable accessibilityRole="button" accessibilityLabel={`Ça me plaît : ${recommendation.venue.name}`} aria-pressed={liked} accessibilityState={{ selected: liked, disabled: !!outing?.confirmedVenueId || saving || busy || cached }} disabled={!!outing?.confirmedVenueId || saving || busy || cached} onPress={() => void action(() => store.react(recommendation.venue.id, !liked))} style={{ ...ui.row, minHeight: 44 }}><ThumbsUp size={18} color={liked ? colors.blue : colors.muted} /><Text style={{ color: liked ? colors.blue : colors.muted }}>{liked ? 'Ça me plaît !' : 'Ça me plaît'} · {votes.length}</Text></Pressable>
-      {canEdit && <Button secondary={!best} disabled={busy || cached} loading={saving} onPress={() => void action(() => store.confirm(recommendation.venue.id))}>{best ? 'On se retrouve ici' : 'Choisir ce lieu'}</Button>}
-    </View>;
-  }
-  return <Shell><View style={{ gap: 28 }}>
-    <View style={{ gap: 12 }}><View style={ui.between}><Text style={ui.label}>{outing.confirmedVenueId ? 'LE RENDEZ-VOUS EST PRIS' : 'TA SORTIE · ÉTAPE 4 / 4'}</Text><Text style={ui.label}>SORTIE PARTAGÉE</Text></View><Text accessibilityRole="header" style={ui.title}>{outing.confirmedVenueId ? 'C’est décidé. On y va !' : 'Des amis. Un même point.'}</Text><View style={{ ...ui.row, flexWrap: 'wrap' }}><Text style={ui.body}>{activityLabels[outing.activity]}</Text><Text style={ui.body}>·</Text><Clock3 size={16} color={colors.muted} /><Text style={ui.body}>{new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long' }).format(new Date(outing.startsAt))} · {formatTime(outing.startsAt)} à {formatTime(outing.endsAt)}</Text></View></View>
+  const cards = confirmed ? [confirmed] : visibleResults;
+  return <Shell><View className="gap-7">
+    <OutingHeader outing={outing} />
     {cached && <Notice>{`Dernière version enregistrée · ${formatTime(outing.updatedAt)}. Actualise avant de choisir un lieu.`}</Notice>}
-    {!!error && <View style={{ gap: 10 }}><Notice warning>{error}</Notice><Button secondary onPress={() => void store.refresh()}>Réessayer</Button></View>}
+    {!!error && <View className="gap-2.5"><Notice warning>{error}</Notice><Button secondary onPress={() => void store.refresh()}>Réessayer</Button></View>}
     {!!message && <Notice>{message}</Notice>}
-    <View style={{ flexDirection: wide ? 'row' : 'column', gap: 28, alignItems: 'flex-start' }}>
-      <View style={{ width: wide ? 300 : '100%', gap: 20 }}><View style={ui.card}>
-        <View style={ui.between}><Text style={ui.subtitle}>La bande</Text><View style={{ backgroundColor: '#F0F1F3', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 20 }}><Text style={{ fontSize: 12, fontWeight: '600', color: colors.muted }}>{outing.participants.length} / 10</Text></View></View>
-        {outing.participants.map((p, i) => <View key={p.id} style={ui.row}><View style={{ width: 38, height: 38, borderRadius: 38, backgroundColor: ['#E6ECFF', '#FAE8DC', '#EAF0D8', '#EDE6F5'][i % 4], alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: colors.ink, fontWeight: '600' }}>{p.name.charAt(0).toUpperCase()}</Text></View><View style={{ flex: 1, gap: 3 }}><Text style={{ fontSize: 14, fontWeight: '600', color: colors.ink }}>{p.name}{i === 0 ? ' · organise' : ''}</Text><Text style={{ fontSize: 12, color: colors.muted }}>{stations.find(s => s.id === p.departureId)?.name ?? p.departureId}</Text></View>{canEdit && i > 0 && <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${p.name}`} disabled={saving} onPress={() => void action(() => store.remove(p.id))} style={{ padding: 12 }}><Trash2 size={16} color={colors.muted} /></Pressable>}</View>)}
-        {canEdit && outing.participants.length < 10 && <Pressable accessibilityRole="button" onPress={() => { setAdding(!adding); setDeparture(''); }} style={{ ...ui.row, minHeight: 48, borderTopWidth: 1, borderColor: colors.border, paddingTop: 12 }}><Plus size={18} color={colors.blue} /><Text style={{ color: colors.blue, fontWeight: '500', fontSize: 14 }}>Ajouter un ami</Text></Pressable>}
-        {adding && canEdit && <View style={{ gap: 14 }}><Field label="Son prénom" value={name} onChangeText={setName} maxLength={40} /><StationPicker label="Son départ" stations={stations} value={departure} onChange={setDeparture} /><StationPicker label="Son retour" stations={stations} value={returnStation || departure} onChange={setReturnStation} /><Button loading={saving} disabled={!name.trim() || !departure} onPress={() => void action(async () => { await store.add(name.trim(), departure, returnStation || departure); setAdding(false); setName(''); setReturnStation(''); })}>Ajouter au groupe</Button></View>}
+    <View className={cx('items-start gap-7', wide ? 'flex-row' : 'flex-col')}>
+      <View className={cx('gap-5', wide ? 'w-[300px]' : 'w-full')}>
+        <ParticipantList outing={outing} stations={stations} canEdit={canEdit} saving={saving}
+          onRemove={id => void action(() => store.remove(id))}
+          onAdd={(name, departure, returnStation) => action(() => store.add(name, departure, returnStation))} />
+        <OutingActions outing={outing} confirmed={!!confirmed} saving={saving} pushEnabled={pushEnabledFor === outing.id}
+          onShare={() => void action(share)}
+          onCopyCode={() => void action(async () => { await Clipboard.setStringAsync(outing.shortCode!); setMessage('Code copié. Tes amis peuvent le saisir dans « Rejoindre avec un code ».'); })}
+          onStartTracking={() => void action(async () => { await startTracking(outing.id); setMessage('Ta position reste entre vous. Le partage s’arrête à ton arrivée ou après 90 min.'); })}
+          onStopTracking={() => void action(async () => { await stopTracking(); setMessage('Le partage de ta position est arrêté.'); })}
+          onCalendar={() => void action(() => addToCalendar(outing, confirmed!.venue))}
+          onTogglePush={() => void action(async () => {
+            if (pushEnabledFor === outing.id) { await disableConfirmationPush(); setPushEnabledFor(null); setMessage('Les notifications sont désactivées sur ce téléphone.'); }
+            else { await enableConfirmationPush(outing.id); setPushEnabledFor(outing.id); setMessage('Tu recevras une notification quand le lieu sera confirmé.'); }
+          })} />
       </View>
-      <Pressable accessibilityRole="button" onPress={() => void action(share)} style={{ ...ui.row, justifyContent: 'center', minHeight: 48 }}><Share2 size={16} color={colors.blue} /><Text style={{ color: colors.blue, fontWeight: '600' }}>{confirmed ? 'Partager le rendez-vous' : 'Inviter mes amis'}</Text></Pressable>
-      {outing.shortCode && <View style={{ gap: 10 }}><Text style={ui.body}>Code d’invitation : {outing.shortCode}</Text><Button secondary onPress={() => void action(async () => { await Clipboard.setStringAsync(outing.shortCode!); setMessage('Code copié. Tes amis peuvent le saisir dans « Rejoindre avec un code ».'); })}>Copier le code d’invitation</Button></View>}
-      {confirmed && Platform.OS !== 'web' && <><Button secondary loading={saving} onPress={() => void action(async () => {await startTracking(outing.id);setMessage('Ta position reste entre vous. Le partage s’arrête à ton arrivée ou après 90 min.');})}>Je suis en route</Button><Button secondary loading={saving} onPress={() => void action(async () => {await stopTracking();setMessage('Le partage de ta position est arrêté.');})}>Je suis arrivé</Button></>}
-      {confirmed && <Button secondary loading={saving} onPress={() => void action(() => addToCalendar(outing, confirmed.venue))}>Ajouter au calendrier</Button>}
-      {!confirmed && Platform.OS !== 'web' && <Button secondary loading={saving} onPress={() => void action(async () => {
-        if (pushEnabledFor === outing.id) { await disableConfirmationPush(); setPushEnabledFor(null); setMessage('Les notifications sont désactivées sur ce téléphone.'); }
-        else { await enableConfirmationPush(outing.id); setPushEnabledFor(outing.id); setMessage('Tu recevras une notification quand le lieu sera confirmé.'); }
-      })}>{pushEnabledFor === outing.id ? 'Désactiver les notifications' : 'Me prévenir du lieu choisi'}</Button>}
-      <View style={{ paddingHorizontal: 8, gap: 10 }}><Text style={ui.label}>Juste ce qu’il faut savoir.</Text><Text style={{ ...ui.body, fontSize: 13 }}>Tes stations restent entre vous. La sortie est effacée 24 h après sa fin.</Text></View></View>
-      <View style={{ flex: 1, width: '100%', gap: 20 }}>
-        <View style={ui.between}><Text style={ui.subtitle}>{confirmed ? 'Votre point de rencontre' : 'Les lieux pour vous'}</Text>{results && <Pressable accessibilityRole="button" onPress={() => setShowMap(!showMap)} style={{ ...ui.row, minHeight: 44 }}><MapPin size={16} color={colors.blue} /><Text style={{ color: colors.blue, fontSize: 14 }}>{showMap ? 'Masquer la carte' : 'Voir la carte'}</Text></Pressable>}</View>
-        {!confirmed && outing.activity === 'dinner' && !!results?.recommendations.length && <View style={{ gap: 12 }}><Text style={ui.body}>Jusqu’à 12 restos pour varier les envies. Le premier garde les trajets les plus équilibrés. Les cuisines dépendent des infos disponibles.</Text><View style={{ ...ui.row, flexWrap: 'wrap' }}>{[null, ...availableCuisines].map(value => <Pressable key={value ?? 'all'} accessibilityRole="button" accessibilityState={{ selected: activeCuisine === value }} onPress={() => setCuisine(value)} style={{ padding: 12, borderRadius: 24, backgroundColor: activeCuisine === value ? colors.lime : '#F0F1F3' }}><Text style={{ color: colors.ink }}>{value ? cuisineLabels[value] : 'Tous les restos'}</Text></Pressable>)}</View></View>}
-        {showMap && <LiveVenueMap outing={outing} stations={mapStations} venues={mapVenues} />}
-        {busy && <View style={{ ...ui.card, alignItems: 'center' }}><ActivityIndicator color={colors.blue} /><Text style={ui.body}>{results?.progress?.stage === 'returns' ? `On vérifie les allers et retours… ${results.progress.completed} / ${results.progress.total}` : results?.progress ? `On compare les trajets… ${results.progress.completed} / ${results.progress.total}` : 'On compare les trajets pour vous…'}</Text></View>}
-        {busy && !!results?.stationCandidates?.length && <View style={ui.card}><Text style={ui.subtitle}>Un premier point de rencontre</Text><Text style={ui.body}>{stations.find(s=>s.id===results.stationCandidates![0]!.stationId)?.name ?? 'Station en cours de vérification'}</Text><Text style={ui.body}>Retour en cours de vérification. Tu pourras choisir un lieu dès que le calcul sera terminé.</Text></View>}
+      <View className="w-full flex-1 gap-5">
+        <View className="flex-row items-center justify-between gap-3">
+          <Subtitle>{confirmed ? 'Votre point de rencontre' : 'Les lieux pour vous'}</Subtitle>
+          {results && <Pressable accessibilityRole="button" onPress={() => setShowMap(!showMap)} className="min-h-[44px] flex-row items-center gap-3">
+            <MapPin size={16} color={palette.brand} /><Text className="text-small text-brand">{showMap ? 'Masquer la carte' : 'Voir la carte'}</Text>
+          </Pressable>}
+        </View>
+        {!confirmed && outing.activity === 'dinner' && !!results?.recommendations.length && <CuisineFilter available={availableCuisines} active={activeCuisine} onChange={setCuisine} />}
+        {showMap && <LiveVenueMap outing={outing} stations={mapStations} venues={visibleResults.map(r => r.venue)} />}
+        {busy && <CalculationProgress results={results} stations={stations} />}
         {!confirmed && <>
           {coverage?.ready === false && <Notice>La recherche du juste milieu est en pause. L’organisateur peut choisir un lieu et faire vérifier les allers et retours.</Notice>}
-          {canEdit && <ManualVenuePicker outing={outing} stations={stations} findVenues={store.findVenues} disabled={saving || busy || cached} selectVenue={venue => action(() => store.selectVenue(venue))} />}
+          {canEdit && <ManualVenuePicker outing={outing} stations={stations} findVenues={store.findVenues} disabled={saving || busy || cached} selectVenue={venue => action(() => store.selectVenue(venue)).then(() => undefined)} />}
           {!canEdit && outing.selectedVenue && !results?.recommendations.length && <Notice>Lieu choisi : {outing.selectedVenue.name}. Les allers et retours restent à vérifier.</Notice>}
         </>}
-        {outing.participants.length < 2 && coverage?.ready && <View style={{ ...ui.card, alignItems: 'center', paddingVertical: 48 }}><Users size={36} color={colors.blue} /><Text style={ui.subtitle}>Il ne manque qu’un ami.</Text><Text style={{ ...ui.body, textAlign: 'center', maxWidth: 350 }}>Ajoute un deuxième départ pour découvrir les lieux les plus équilibrés.</Text></View>}
-        {!busy && results?.progress?.stage === 'complete' && results?.recommendations.length === 0 && <Notice warning>Aucun lieu ne permet de réunir tout le monde avec un retour vérifié. Essaie une sortie plus tôt ou un autre type de lieu.</Notice>}
-        {(confirmed ? [venueCard(confirmed, 0)] : visibleResults.map(r => venueCard(r, results!.recommendations.indexOf(r))))}
-        {results && <Pressable accessibilityRole="link" accessibilityLabel="Crédits et licence OpenStreetMap" onPress={() => void action(() => Linking.openURL('https://www.openstreetmap.org/copyright'))} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ fontSize: 12, color: colors.blue }}>Lieux : © les contributeurs OpenStreetMap · ODbL ↗</Text></Pressable>}
-        {results && <Text style={{ fontSize: 12, lineHeight: 19, color: colors.muted }}>Horaires théoriques · calcul à {formatTime(results.computedAt)}. {results.warnings.join(' ')}</Text>}
+        {outing.participants.length < 2 && coverage?.ready && <EmptyGroup />}
+        {!busy && results?.progress?.stage === 'complete' && results.recommendations.length === 0 && <Notice warning>Aucun lieu ne permet de réunir tout le monde avec un retour vérifié. Essaie une sortie plus tôt ou un autre type de lieu.</Notice>}
+        {cards.map(recommendation => {
+          const id = recommendation.venue.id, votes = store.reactions.filter(r => r.venueId === id), liked = votes.some(r => r.userId === userId);
+          return <ResultCard key={id} recommendation={recommendation} index={confirmed ? 0 : results!.recommendations.indexOf(recommendation)} outing={outing} stations={stations}
+            best={!outing.selectedVenue && id === results?.recommendations[0]?.venue.id} votes={votes.length} liked={liked} expanded={expanded === id}
+            reactDisabled={!!outing.confirmedVenueId || saving || busy || cached} canConfirm={canEdit} confirmDisabled={busy || cached} saving={saving}
+            onToggle={() => setExpanded(expanded === id ? null : id)}
+            onReact={() => void action(() => store.react(id, !liked))}
+            onConfirm={() => void action(() => store.confirm(id))}
+            onReviews={() => void action(() => Linking.openURL(venueReviewsUrl(recommendation.venue)))} />;
+        })}
+        {results && <Pressable accessibilityRole="link" accessibilityLabel="Crédits et licence OpenStreetMap" onPress={() => void action(() => Linking.openURL('https://www.openstreetmap.org/copyright'))} className="min-h-[44px] justify-center">
+          <Text className="text-caption text-brand">Lieux : © les contributeurs OpenStreetMap · ODbL ↗</Text>
+        </Pressable>}
+        {results && <Caption className="leading-[19px]">Horaires théoriques · calcul à {formatTime(results.computedAt)}. {results.warnings.join(' ')}</Caption>}
       </View>
     </View>
   </View></Shell>;

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { authProvidersSchema } from '@onyva/shared';
 import type { z } from 'zod';
-import { Button, Notice, ui } from './ui';
+import { Body, Button, Notice } from './ui';
 import { signIn, supabase } from '../lib/supabase';
 
 // mode 'link' attaches Google or Apple to the current anonymous session, 'signin' opens an existing account.
@@ -32,10 +32,10 @@ export default function SignInButtons({ onError, mode = 'signin' }: { onError: (
     finally { setBusy(false); }
   }
   if (!supabase) return null;
-  if (failed) return <View style={{ gap: 10 }}><Notice warning>La connexion est indisponible pour le moment.</Notice><Button secondary onPress={() => setAttempt(attempt + 1)}>Réessayer la connexion</Button></View>;
-  if (!providers) return <Text style={ui.body}>Chargement des moyens de connexion…</Text>;
+  if (failed) return <View className="gap-2.5"><Notice warning>La connexion est indisponible pour le moment.</Notice><Button secondary onPress={() => setAttempt(attempt + 1)}>Réessayer la connexion</Button></View>;
+  if (!providers) return <Body>Chargement des moyens de connexion…</Body>;
   const google = providers.external.google && (Platform.OS !== 'ios' || providers.external.apple);
-  return <View style={{ gap: 10 }}>
+  return <View className="gap-2.5">
     {providers.external.apple && <Button secondary={mode === 'signin'} loading={busy} onPress={() => void connect('apple')}>{mode === 'link' ? 'Relier mon compte Apple' : 'Continuer avec Apple'}</Button>}
     {google && <Button secondary loading={busy} onPress={() => void connect('google')}>{mode === 'link' ? 'Relier mon compte Google' : 'Continuer avec Google'}</Button>}
     {!providers.external.apple && !google && <Notice>Aucun compte ne peut être relié sur cet appareil pour le moment.</Notice>}
