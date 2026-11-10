@@ -10,6 +10,8 @@ module.exports = {
       colors: tokens.colors,
       borderRadius: tokens.radius,
       fontSize: tokens.fontSize,
+      // Free fonts (SIL Open Font License), one family per weight: Android does not pick a weight inside a custom family.
+      fontFamily: tokens.fontFamily,
     },
   },
   plugins: [],

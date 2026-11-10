@@ -30,7 +30,7 @@ export function CalculationSteps({ progress, manualChoice }: { progress?: Progre
           {i < steps.length - 1 && <View className={cx('my-1 w-0.5 flex-1', done ? 'bg-success' : 'bg-border')} style={{ minHeight: 18 }} />}
         </View>
         <View className="flex-1 gap-2 pb-4 pt-1">
-          <Text className={cx('text-body', active ? 'font-semibold text-ink' : done ? 'text-ink' : 'text-muted')}>{step.label}</Text>
+          <Text className={cx('text-body', active ? 'font-sans-semibold text-ink' : done ? 'font-sans text-ink' : 'font-sans text-muted')}>{step.label}</Text>
           {counter && <View className="gap-1.5">
             <View className="h-1.5 overflow-hidden rounded-pill bg-track"><View className="h-1.5 rounded-pill bg-brand" style={{ width: `${Math.round(progress!.completed / progress!.total * 100)}%` }} /></View>
             <Caption style={{ fontVariant: ['tabular-nums'] }}>{counter}</Caption>

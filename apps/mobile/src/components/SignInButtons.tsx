@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { authProvidersSchema } from '@onyva/shared';
 import type { z } from 'zod';
-import { Body, Button, Notice } from './ui';
+import { Button, Notice, Skeleton, SkeletonGroup } from './ui';
 import { signIn, supabase } from '../lib/supabase';
 
 // mode 'link' attaches Google or Apple to the current anonymous session, 'signin' opens an existing account.
@@ -33,7 +33,7 @@ export default function SignInButtons({ onError, mode = 'signin' }: { onError: (
   }
   if (!supabase) return null;
   if (failed) return <View className="gap-2.5"><Notice warning>La connexion est indisponible pour le moment.</Notice><Button secondary onPress={() => setAttempt(attempt + 1)}>Réessayer la connexion</Button></View>;
-  if (!providers) return <Body>Chargement des moyens de connexion…</Body>;
+  if (!providers) return <SkeletonGroup label="Chargement des moyens de connexion"><Skeleton height={52} radius={14} /><Skeleton height={52} radius={14} /></SkeletonGroup>;
   const google = providers.external.google && (Platform.OS !== 'ios' || providers.external.apple);
   return <View className="gap-2.5">
     {providers.external.apple && <Button secondary={mode === 'signin'} loading={busy} onPress={() => void connect('apple')}>{mode === 'link' ? 'Relier mon compte Apple' : 'Continuer avec Apple'}</Button>}

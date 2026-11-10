@@ -4,6 +4,7 @@ import { MapPin, Search, X } from 'lucide-react-native';
 import type { Station } from '@onyva/shared';
 import { palette } from '../../theme';
 import { Card } from './Card';
+import { Skeleton, SkeletonGroup } from './Skeleton';
 import { cx } from './cx';
 import { Body, Caption, Label } from './Text';
 
@@ -27,16 +28,17 @@ export function StationPicker({ label = 'Ta station de départ', stations, value
     <Label>{label}</Label>
     <Pressable accessibilityRole="button" accessibilityLabel={`${label} : ${selected?.name ?? 'Choisir'}`} onPress={() => setOpen(!open)}
       className={cx('min-h-[56px] flex-row items-center justify-between gap-3 rounded-medium border bg-surface p-4', open ? 'border-brand' : 'border-border')}>
-      <View className="flex-row items-center gap-3"><MapPin size={20} color={palette.brand} /><Text className="text-body text-ink">{selected?.name ?? 'Choisis une station'}</Text></View>
+      <View className="flex-row items-center gap-3"><MapPin size={20} color={palette.brand} /><Text className="font-sans text-body text-ink">{selected?.name ?? 'Choisis une station'}</Text></View>
       {open ? <X size={18} color={palette.muted} /> : <Search size={18} color={palette.muted} />}
     </Pressable>
     {open && <Card className="gap-1 p-3">
-      <TextInput autoFocus={Platform.OS === 'web'} accessibilityLabel="Rechercher une station" placeholder="Cherche une station…" placeholderTextColor={palette.muted} value={query} onChangeText={setQuery} className="min-h-[48px] p-3 text-body text-ink" />
+      <TextInput autoFocus={Platform.OS === 'web'} accessibilityLabel="Rechercher une station" placeholder="Cherche une station…" placeholderTextColor={palette.muted} value={query} onChangeText={setQuery} className="min-h-[48px] p-3 font-sans text-body text-ink" />
       {filtered.map(station => <Pressable key={station.id} accessibilityRole="button" onPress={() => { onChange(station.id); setOpen(false); setQuery(''); }} className="min-h-[48px] gap-1.5 border-t border-border p-3">
-        <Text className="text-body text-ink">{station.name}</Text>
+        <Text className="font-sans text-body text-ink">{station.name}</Text>
         <Caption>Lignes {station.lines.join(' · ')}</Caption>
       </Pressable>)}
-      {filtered.length === 0 && <Body className="p-3">Aucune station trouvée. Essaie un autre nom.</Body>}
+      {stations.length === 0 && <View className="p-3"><SkeletonGroup label="Chargement des stations"><Skeleton width="70%" /><Skeleton width="50%" /><Skeleton width="60%" /></SkeletonGroup></View>}
+      {stations.length > 0 && filtered.length === 0 && <Body className="p-3">Aucune station trouvée. Essaie un autre nom.</Body>}
     </Card>}
   </View>;
 }

@@ -13,7 +13,7 @@ export function OutingActions({ outing, confirmed, saving, pushEnabled, onShare,
   const native = Platform.OS !== 'web';
   return <>
     <Pressable accessibilityRole="button" onPress={onShare} className="min-h-[48px] flex-row items-center justify-center gap-3">
-      <Share2 size={16} color={palette.brand} /><Text className="font-semibold text-brand">{confirmed ? 'Partager le rendez-vous' : 'Inviter mes amis'}</Text>
+      <Share2 size={16} color={palette.brand} /><Text className="font-sans-semibold text-brand">{confirmed ? 'Partager le rendez-vous' : 'Inviter mes amis'}</Text>
     </Pressable>
     {outing.shortCode && <View className="gap-2.5"><Body>Code d’invitation : {outing.shortCode}</Body><Button secondary onPress={onCopyCode}>Copier le code d’invitation</Button></View>}
     {confirmed && native && <>

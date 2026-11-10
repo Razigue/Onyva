@@ -23,15 +23,15 @@ export function ParticipantList({ outing, stations, canEdit, saving, onRemove, o
   return <Card>
     <View className="flex-row items-center justify-between gap-3">
       <Subtitle>La bande</Subtitle>
-      <View className="rounded-pill bg-chip px-2.5 py-1"><Caption className="font-semibold">{outing.participants.length} / 10</Caption></View>
+      <View className="rounded-pill bg-chip px-2.5 py-1"><Caption className="font-sans-semibold">{outing.participants.length} / 10</Caption></View>
     </View>
     {outing.participants.map((p, i) => <View key={p.id} className="flex-row items-center gap-3">
-      <View className="h-[38px] w-[38px] items-center justify-center rounded-pill" style={{ backgroundColor: avatarColors[i % avatarColors.length] }}><Text className="font-semibold text-ink">{p.name.charAt(0).toUpperCase()}</Text></View>
-      <View className="flex-1 gap-1"><Text className="text-small font-semibold text-ink">{p.name}{i === 0 ? ' · organise' : ''}</Text><Caption>{stations.find(s => s.id === p.departureId)?.name ?? p.departureId}</Caption></View>
+      <View className="h-[38px] w-[38px] items-center justify-center rounded-pill" style={{ backgroundColor: avatarColors[i % avatarColors.length] }}><Text className="font-sans-semibold text-ink">{p.name.charAt(0).toUpperCase()}</Text></View>
+      <View className="flex-1 gap-1"><Text className="text-small font-sans-semibold text-ink">{p.name}{i === 0 ? ' · organise' : ''}</Text><Caption>{stations.find(s => s.id === p.departureId)?.name ?? p.departureId}</Caption></View>
       {canEdit && i > 0 && <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${p.name}`} disabled={saving} onPress={() => onRemove(p.id)} className="p-3"><Trash2 size={16} color={palette.muted} /></Pressable>}
     </View>)}
     {canEdit && outing.participants.length < 10 && <Pressable accessibilityRole="button" onPress={() => { setAdding(!adding); setDeparture(''); }} className="min-h-[48px] flex-row items-center gap-3 border-t border-border pt-3">
-      <Plus size={18} color={palette.brand} /><Text className="text-small font-medium text-brand">Ajouter un ami</Text>
+      <Plus size={18} color={palette.brand} /><Text className="text-small font-sans-medium text-brand">Ajouter un ami</Text>
     </Pressable>}
     {adding && canEdit && <View className="gap-3.5">
       <Field label="Son prénom" value={name} onChangeText={setName} maxLength={40} />

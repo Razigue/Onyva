@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, Pressable, Share, Text, View, useWindowDimensions } from 'react-native';
+import { Linking, Platform, Pressable, Share, Text, View, useWindowDimensions } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { MapPin } from 'lucide-react-native';
@@ -16,8 +16,9 @@ import { OutingActions } from '../src/components/outing/OutingActions';
 import { OutingHeader } from '../src/components/outing/OutingHeader';
 import { ParticipantList } from '../src/components/outing/ParticipantList';
 import { ResultCard } from '../src/components/outing/ResultCard';
-import { Body, Button, Caption, cx, Notice, Shell, Subtitle, Title } from '../src/components/ui';
+import { Button, Caption, ConvergenceMotif, cx, EmptyState, Notice, Shell, Skeleton, SkeletonGroup, Subtitle } from '../src/components/ui';
 import { addToCalendar } from '../src/lib/calendar';
+import { tapSuccess } from '../src/lib/haptics';
 import { startTracking, stopTracking } from '../src/lib/location-task';
 import { disableConfirmationPush, enableConfirmationPush } from '../src/lib/notifications';
 import { useStore } from '../src/lib/store';
@@ -37,12 +38,13 @@ export default function OutingScreen() {
   const availableCuisines = [...new Set(results?.recommendations.flatMap(r => r.venue.cuisines ?? []) ?? [])];
   const activeCuisine = cuisine && availableCuisines.includes(cuisine) ? cuisine : null;
   const visibleResults = results?.recommendations.filter(r => !activeCuisine || r.venue.cuisines?.includes(activeCuisine)) ?? [];
-  if (!store.ready) return <Shell><ActivityIndicator accessibilityLabel="Chargement de ta sortie" color={palette.brand} /></Shell>;
-  if (!outing) return <Shell narrow><View className="mb-8 gap-5">
-    <Title>La prochaine sortie commence ici.</Title>
-    <Body>Tu n’as pas encore de sortie en cours. Invite tes amis et trouvons votre point de rencontre.</Body>
-    <Button onPress={() => router.push('/create')}>Créer une sortie</Button>
-  </View></Shell>;
+  if (!store.ready) return <Shell><SkeletonGroup label="Chargement de ta sortie">
+    <Skeleton width={180} height={14} /><Skeleton width="70%" height={30} /><Skeleton width="50%" height={18} />
+    <View className="mt-4 gap-3"><Skeleton height={120} radius={20} /><Skeleton height={220} radius={20} /></View>
+  </SkeletonGroup></Shell>;
+  if (!outing) return <Shell narrow><EmptyState variant="together" title="La prochaine sortie commence ici." action={<Button onPress={() => router.push('/create')}>Organiser</Button>}>
+    Tu n’as pas encore de sortie en cours. Invite tes amis et trouvons votre point de rencontre.
+  </EmptyState></Shell>;
   const owner = outing.ownerId === userId;
   const confirmed = results?.recommendations.find(r => r.venue.id === outing.confirmedVenueId);
   const canEdit = owner && !outing.confirmedVenueId;
@@ -66,7 +68,10 @@ export default function OutingScreen() {
   const cards = confirmed ? [confirmed] : visibleResults;
   return <Shell><View className="gap-7">
     <OutingHeader outing={outing} />
-    {cached && <Notice>{`Dernière version enregistrée · ${formatTime(outing.updatedAt)}. Actualise avant de choisir un lieu.`}</Notice>}
+    {cached && <View accessibilityRole="alert" className="flex-row items-center gap-3 rounded-medium border border-border bg-surface p-3.5">
+      <ConvergenceMotif variant="offline" size="small" />
+      <Caption className="flex-1 text-small text-ink">{`Dernière version enregistrée · ${formatTime(outing.updatedAt)}. Actualise avant de choisir un lieu.`}</Caption>
+    </View>}
     {!!error && <View className="gap-2.5"><Notice warning>{error}</Notice><Button secondary onPress={() => void store.refresh()}>Réessayer</Button></View>}
     {!!message && <Notice>{message}</Notice>}
     <View className={cx('items-start gap-7', wide ? 'flex-row' : 'flex-col')}>
@@ -89,7 +94,7 @@ export default function OutingScreen() {
         <View className="flex-row items-center justify-between gap-3">
           <View className="flex-row items-center gap-2">{!!results?.recommendations.length && <ConvergenceMark replay={results.computedAt} />}<Subtitle>{confirmed ? 'Votre point de rencontre' : 'Les lieux pour vous'}</Subtitle></View>
           {results && <Pressable accessibilityRole="button" onPress={() => setShowMap(!showMap)} className="min-h-[44px] flex-row items-center gap-3">
-            <MapPin size={16} color={palette.brand} /><Text className="text-small text-brand">{showMap ? 'Masquer la carte' : 'Voir la carte'}</Text>
+            <MapPin size={16} color={palette.brand} /><Text className="font-sans text-small text-brand">{showMap ? 'Masquer la carte' : 'Voir la carte'}</Text>
           </Pressable>}
         </View>
         {!confirmed && outing.activity === 'dinner' && !!results?.recommendations.length && <CuisineFilter available={availableCuisines} active={activeCuisine} onChange={setCuisine} />}
@@ -102,7 +107,7 @@ export default function OutingScreen() {
           {!canEdit && outing.selectedVenue && !results?.recommendations.length && <Notice>Lieu choisi : {outing.selectedVenue.name}. Les allers et retours restent à vérifier.</Notice>}
         </>}
         {outing.participants.length < 2 && coverage?.ready && <EmptyGroup />}
-        {!busy && results?.progress?.stage === 'complete' && results.recommendations.length === 0 && <Notice warning>Aucun lieu ne permet de réunir tout le monde avec un retour vérifié. Essaie une sortie plus tôt ou un autre type de lieu.</Notice>}
+        {!busy && results?.progress?.stage === 'complete' && results.recommendations.length === 0 && <EmptyState variant="apart" title="Aucun lieu pour tout le monde">Aucun lieu ne permet de réunir tout le monde avec un retour vérifié. Essaie une sortie plus tôt ou un autre type de lieu.</EmptyState>}
         {cards.map(recommendation => {
           const id = recommendation.venue.id, votes = store.reactions.filter(r => r.venueId === id), liked = votes.some(r => r.userId === userId);
           return <ResultCard key={id} recommendation={recommendation} index={confirmed ? 0 : results!.recommendations.indexOf(recommendation)} outing={outing} stations={stations}
@@ -110,11 +115,11 @@ export default function OutingScreen() {
             reactDisabled={!!outing.confirmedVenueId || saving || busy || cached} canConfirm={canEdit} confirmDisabled={busy || cached} saving={saving}
             onToggle={() => setExpanded(expanded === id ? null : id)}
             onReact={() => void action(() => store.react(id, !liked))}
-            onConfirm={() => void action(() => store.confirm(id))}
+            onConfirm={() => void action(() => store.confirm(id)).then(done => { if (done) tapSuccess(); })}
             onReviews={() => void action(() => Linking.openURL(venueReviewsUrl(recommendation.venue)))} />;
         })}
         {results && <Pressable accessibilityRole="link" accessibilityLabel="Crédits et licence OpenStreetMap" onPress={() => void action(() => Linking.openURL('https://www.openstreetmap.org/copyright'))} className="min-h-[44px] justify-center">
-          <Text className="text-caption text-brand">Lieux : © les contributeurs OpenStreetMap · ODbL ↗</Text>
+          <Text className="font-sans text-caption text-brand">Lieux : © les contributeurs OpenStreetMap · ODbL ↗</Text>
         </Pressable>}
         {results && <Caption className="leading-[19px]">Horaires théoriques · calcul à {formatTime(results.computedAt)}. {results.warnings.join(' ')}</Caption>}
       </View>
