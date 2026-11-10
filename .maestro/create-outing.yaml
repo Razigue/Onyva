@@ -2,7 +2,8 @@ appId: fr.onyva.app
 ---
 - launchApp:
     clearState: true
-- tapOn: "On organise ça"
+- tapOn: "Organiser"
+# Les valeurs proposées suffisent : « Suivant », « Suivant », « Créer ».
 - tapOn:
     id: "wizard-next"
 - tapOn:

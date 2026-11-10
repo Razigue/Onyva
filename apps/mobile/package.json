@@ -13,6 +13,7 @@
     "@onyva/fairness": "workspace:*",
     "@onyva/shared": "workspace:*",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "8.6.0",
     "@supabase/supabase-js": "^2.84.0",
     "expo": "~55.0.32",
     "expo-application": "~55.0.19",
