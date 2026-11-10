@@ -1,19 +1,36 @@
+import { useEffect } from 'react';
 import { Text, View } from 'react-native';
-import type { Participant, Recommendation } from '@onyva/shared';
+import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
+import type { Participant } from '@onyva/shared';
 import { personColors } from '../../theme';
 import { minutes } from './format';
 
-/** One bar per person, scaled on the longest trip. The name and minutes are always written next to the bar. */
-export function JourneyBars({ recommendation, participants }: { recommendation: Recommendation; participants: Participant[] }) {
-  return <View className="gap-3">{recommendation.journeys.map((journey, i) => {
-    const person = participants.find(p => p.id === journey.participantId);
-    const width = Math.max(2, journey.outbound.duration / Math.max(60, recommendation.maximum) * 100);
-    return <View key={journey.participantId} accessible accessibilityLabel={`${person?.name} : ${minutes(journey.outbound.duration)} minutes`} className="gap-2">
+type Row = { participantId: string; duration: number };
+
+function Bar({ width, color, delay, replay }: { width: number; color: string; delay: number; replay: string }) {
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.value = 0;
+    progress.value = withDelay(delay, withTiming(1, { duration: 450, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System }));
+  }, [replay, delay, progress]);
+  const style = useAnimatedStyle(() => ({ width: `${width * progress.value}%` }));
+  return <View className="h-2 overflow-hidden rounded-pill bg-track"><Animated.View style={[{ height: 8, borderRadius: 999, backgroundColor: color }, style]} /></View>;
+}
+
+/**
+ * One bar per person, scaled on the longest trip: the bars grow towards the maximum when results arrive.
+ * The minutes are written as text from the start, so the motion never delays the information.
+ */
+export function JourneyBars({ rows, maximum, participants, replay, estimated = false }: { rows: Row[]; maximum: number; participants: Participant[]; replay: string; estimated?: boolean }) {
+  return <View className="gap-3">{rows.map((row, i) => {
+    const person = participants.find(p => p.id === row.participantId);
+    const value = `${estimated ? 'environ ' : ''}${minutes(row.duration)} min`;
+    return <View key={row.participantId} accessible accessibilityLabel={`${person?.name} : ${estimated ? 'environ ' : ''}${minutes(row.duration)} minutes`} className="gap-1.5">
       <View className="flex-row items-center justify-between gap-3">
         <Text className="text-small text-ink">{person?.name}</Text>
-        <Text className="text-small font-semibold text-ink" style={{ fontVariant: ['tabular-nums'] }}>{minutes(journey.outbound.duration)} min</Text>
+        <Text className="text-small font-semibold text-ink" style={{ fontVariant: ['tabular-nums'] }}>{value}</Text>
       </View>
-      <View className="h-[7px] rounded bg-track"><View className="h-[7px] rounded" style={{ width: `${width}%`, backgroundColor: personColors[i % personColors.length] }} /></View>
+      <Bar width={Math.max(2, row.duration / Math.max(60, maximum) * 100)} color={personColors[i % personColors.length]!} delay={i * 60} replay={replay} />
     </View>;
   })}</View>;
 }
