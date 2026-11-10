@@ -7,9 +7,11 @@ import { activityLabels, formatTime, venueReviewsUrl } from '@onyva/shared';
 import type { Cuisine } from '@onyva/shared';
 import LiveVenueMap from '../src/components/LiveVenueMap';
 import ManualVenuePicker from '../src/components/ManualVenuePicker';
-import { CalculationProgress } from '../src/components/outing/CalculationProgress';
+import { CalculationSteps } from '../src/components/outing/CalculationSteps';
+import { ConvergenceMark } from '../src/components/outing/ConvergenceMark';
 import { CuisineFilter } from '../src/components/outing/CuisineFilter';
 import { EmptyGroup } from '../src/components/outing/EmptyGroup';
+import { FirstCandidate } from '../src/components/outing/FirstCandidate';
 import { OutingActions } from '../src/components/outing/OutingActions';
 import { OutingHeader } from '../src/components/outing/OutingHeader';
 import { ParticipantList } from '../src/components/outing/ParticipantList';
@@ -85,14 +87,15 @@ export default function OutingScreen() {
       </View>
       <View className="w-full flex-1 gap-5">
         <View className="flex-row items-center justify-between gap-3">
-          <Subtitle>{confirmed ? 'Votre point de rencontre' : 'Les lieux pour vous'}</Subtitle>
+          <View className="flex-row items-center gap-2">{!!results?.recommendations.length && <ConvergenceMark replay={results.computedAt} />}<Subtitle>{confirmed ? 'Votre point de rencontre' : 'Les lieux pour vous'}</Subtitle></View>
           {results && <Pressable accessibilityRole="button" onPress={() => setShowMap(!showMap)} className="min-h-[44px] flex-row items-center gap-3">
             <MapPin size={16} color={palette.brand} /><Text className="text-small text-brand">{showMap ? 'Masquer la carte' : 'Voir la carte'}</Text>
           </Pressable>}
         </View>
         {!confirmed && outing.activity === 'dinner' && !!results?.recommendations.length && <CuisineFilter available={availableCuisines} active={activeCuisine} onChange={setCuisine} />}
         {showMap && <LiveVenueMap outing={outing} stations={mapStations} venues={visibleResults.map(r => r.venue)} />}
-        {busy && <CalculationProgress results={results} stations={stations} />}
+        {busy && <CalculationSteps progress={results?.progress} manualChoice={!!outing.selectedVenue} />}
+        {busy && !!results?.stationCandidates?.length && !results.recommendations.length && <FirstCandidate candidate={results.stationCandidates[0]!} stations={stations} participants={outing.participants} />}
         {!confirmed && <>
           {coverage?.ready === false && <Notice>La recherche du juste milieu est en pause. L’organisateur peut choisir un lieu et faire vérifier les allers et retours.</Notice>}
           {canEdit && <ManualVenuePicker outing={outing} stations={stations} findVenues={store.findVenues} disabled={saving || busy || cached} selectVenue={venue => action(() => store.selectVenue(venue)).then(() => undefined)} />}
@@ -103,7 +106,7 @@ export default function OutingScreen() {
         {cards.map(recommendation => {
           const id = recommendation.venue.id, votes = store.reactions.filter(r => r.venueId === id), liked = votes.some(r => r.userId === userId);
           return <ResultCard key={id} recommendation={recommendation} index={confirmed ? 0 : results!.recommendations.indexOf(recommendation)} outing={outing} stations={stations}
-            best={!outing.selectedVenue && id === results?.recommendations[0]?.venue.id} votes={votes.length} liked={liked} expanded={expanded === id}
+            best={!outing.selectedVenue && id === results?.recommendations[0]?.venue.id} replay={results?.computedAt ?? ''} votes={votes.length} liked={liked} expanded={expanded === id}
             reactDisabled={!!outing.confirmedVenueId || saving || busy || cached} canConfirm={canEdit} confirmDisabled={busy || cached} saving={saving}
             onToggle={() => setExpanded(expanded === id ? null : id)}
             onReact={() => void action(() => store.react(id, !liked))}

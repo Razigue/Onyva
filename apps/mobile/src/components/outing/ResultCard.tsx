@@ -5,18 +5,21 @@ import type { Outing, Recommendation, Station } from '@onyva/shared';
 import { palette } from '../../theme';
 import { Body, Button, Caption, Card, cx, Subtitle } from '../ui';
 import { minutes } from './format';
-import { JourneyBars } from './JourneyBars';
+import { FairnessPanel } from './FairnessPanel';
 import { JourneyDetails } from './JourneyDetails';
 
 type Props = {
   recommendation: Recommendation; index: number; outing: Outing; stations: Station[];
   /** First automatic result: never true for a venue picked by hand. */
-  best: boolean; votes: number; liked: boolean; expanded: boolean;
+  best: boolean;
+  /** Changes with each new result, to replay the arrival animation. */
+  replay: string;
+  votes: number; liked: boolean; expanded: boolean;
   reactDisabled: boolean; canConfirm: boolean; confirmDisabled: boolean; saving: boolean;
   onToggle: () => void; onReact: () => void; onConfirm: () => void; onReviews: () => void;
 };
 
-export function ResultCard({ recommendation, index, outing, stations, best, votes, liked, expanded, reactDisabled, canConfirm, confirmDisabled, saving, onToggle, onReact, onConfirm, onReviews }: Props) {
+export function ResultCard({ recommendation, index, outing, stations, best, replay, votes, liked, expanded, reactDisabled, canConfirm, confirmDisabled, saving, onToggle, onReact, onConfirm, onReviews }: Props) {
   const { venue } = recommendation;
   const selected = venue.id === outing.confirmedVenueId;
   const badge = selected ? 'Lieu confirmé' : outing.selectedVenue ? 'Lieu choisi par le groupe' : best ? 'Le plus équilibré' : `Autre idée · ${index + 1}`;
@@ -29,20 +32,16 @@ export function ResultCard({ recommendation, index, outing, stations, best, vote
       <Subtitle className="text-[24px] leading-[30px]">{venue.name}</Subtitle>
       <View className="flex-row items-center gap-3"><MapPin size={14} color={palette.muted} /><Body>{venue.neighborhood} · {minutes(venue.walkSeconds)} min à pied</Body></View>
     </View>
+    <FairnessPanel rows={recommendation.journeys.map(j => ({ participantId: j.participantId, duration: j.outbound.duration }))} maximum={recommendation.maximum} spread={recommendation.spread} participants={outing.participants} replay={replay} highlight={best} />
     {!!venue.cuisines?.length && <Body>{venue.cuisines.map(value => cuisineLabels[value]).join(' · ')}</Body>}
     {venue.kind === 'dinner' && !venue.cuisines?.length && <Body>Cuisine non renseignée</Body>}
     <Pressable accessibilityRole="link" accessibilityLabel={`Consulter les avis Google pour ${venue.name}`} onPress={onReviews} className="min-h-[44px] justify-center">
       <Text className="text-brand">Consulter les avis Google ↗</Text><Caption>Vérifie la note et les avis avant de choisir.</Caption>
     </Pressable>
-    <JourneyBars recommendation={recommendation} participants={outing.participants} />
-    <View className="flex-row gap-6 border-t border-border pt-[18px]">
-      <View className="gap-1"><Text className="text-title font-semibold text-ink">{minutes(recommendation.maximum)} min</Text><Caption>le trajet le plus long</Caption></View>
-      <View className="gap-1"><Text className="text-title font-semibold text-ink">{minutes(recommendation.spread)} min</Text><Caption>d’écart entre vous</Caption></View>
-    </View>
     <View className="flex-row items-start gap-3">
       <Check size={18} color={palette.success} />
       <View className="flex-1 gap-1">
-        <Text className="text-small font-medium text-ink">{`Un retour prévu après ${formatTime(outing.endsAt)}`}</Text>
+        <Text className="text-small font-medium text-ink">{`Retour vérifié pour chacun après ${formatTime(outing.endsAt)}`}</Text>
         <Caption className="leading-[18px]">{recommendation.journeys.some(j => j.inbound.night) ? 'Un trajet de retour utilise un bus de nuit.' : 'Marche, attente et correspondances incluses.'}</Caption>
       </View>
     </View>
