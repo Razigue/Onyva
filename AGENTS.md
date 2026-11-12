@@ -8,10 +8,12 @@ Onyva est une application Expo iOS et Android qui cherche un lieu de rencontre �
 
 1. L’application parle à Supabase.
 2. Supabase fournit PostgreSQL, PostGIS, Auth anonyme avec Apple et Google facultatifs, Realtime, les Edge Functions et pg_cron.
-3. Transition en cours : les trajets passent de PRIM/Navitia à un moteur maison alimenté par le GTFS IDFM (décision du 6 novembre 2026, voir `docs/engine.md`). Le moteur est un service Node sans état, appelé uniquement par l’Edge Function `recommend` avec un secret partagé. Il peut tourner sur une VM, Oracle Cloud Always Free pour le MVP, sans aucun service payant. Le moteur est branché dans `recommend` derrière `TRANSIT_PROVIDER=engine` ; PRIM reste le fournisseur actif tant que la VM n’est pas déployée.
+3. Transition en cours : les trajets passent de PRIM/Navitia à un moteur maison alimenté par le GTFS IDFM (décision du 6 novembre 2026, voir `docs/engine.md`). Le moteur est un service Node sans état, appelé uniquement par l’Edge Function `recommend` avec un secret partagé. Il tourne sur un VPS OVHcloud VPS-2 à prix mensuel fixe (décision du 12 novembre 2026, voir l’exception ci-dessous). Le moteur est branché dans `recommend` derrière `TRANSIT_PROVIDER=engine` ; PRIM reste le fournisseur actif tant que la VM n’est pas déployée.
 4. Une tâche GitHub Actions hebdomadaire importe les lieux depuis l’extrait régional OpenStreetMap, sans Overpass.
 
 Tout doit rester gratuit au départ. Ne jamais ajouter un service payant, une facturation à l’usage ou un dépassement automatique sans accord explicite. Le dépassement d’un quota bloque le service concerné avec un message clair. La gratuité n’est pas une promesse de capacité illimitée.
+
+Exception acceptée le 12 novembre 2026 : le VPS du moteur (OVHcloud VPS-2, prix mensuel fixe, sans option payante ni facturation au trafic). Oracle Cloud Always Free a refusé l’inscription. Toute autre dépense reste soumise à accord explicite.
 
 ## Structure
 

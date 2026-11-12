@@ -168,7 +168,7 @@ Ces temps sont du **calcul pur** sur un seul fil. Ils n’incluent ni HTTP ni Su
 
 - Pour dix personnes, `oneToAll` sur 2 h coûte environ 10 s en série sur cette machine. L’objectif de trois secondes demande le parallélisme prévu en phase 2 (un fil par cœur, instantané partagé) et une fenêtre de 2 h. Une fenêtre de 4 h triple le coût pour un gain limité : un trajet de plus de 2 h ne sert pas à choisir un lieu équitable. Proposition : fenêtre de 2 h par défaut.
 - Les trajets détaillés sont rapides : 60 trajets en 1,3 à 1,8 s en série, donc moins d’une demi-seconde sur 4 fils.
-- La mémoire tient sous 250 Mo par processus. Avec 4 fils et un instantané partagé, l’estimation est d’environ 400 à 600 Mo, **à vérifier** en phase 2. L’offre Always Free d’Oracle (ARM) suffirait largement, **à vérifier** sur la machine réelle.
+- La mémoire tient sous 250 Mo par processus. Avec 4 fils et un instantané partagé, l’estimation est d’environ 400 à 600 Mo, **à vérifier** en phase 2. L’offre Always Free d’Oracle (ARM) suffirait largement, **à vérifier** sur la machine réelle. Note du 12 novembre 2026 : Oracle a refusé l’inscription, le moteur part sur un VPS OVHcloud (phase 3).
 - Pistes d’optimisation non faites : arrêter la plage dès que toutes les stations utiles sont fixées, réutiliser un `oneToAll` entre participants partant de la même station, préparer les événements de départ une fois par jour de service.
 
 ## Phase 2 : service `apps/engine`
@@ -250,15 +250,22 @@ Ce sont des observations ponctuelles en local, sans réseau entre Supabase et la
 
 Import des stations en simulation, catalogue distant, même instantané : 15 381 stations mises à jour (lignes), 4 ajouts valides, 22 stations GTFS hors des limites de l’Île-de-France du schéma `stationSchema` (ignorées), 1 station active sans desserte GTFS (`stop_area:IDFM:60142`, signalée, laissée active). Rien n’a été écrit.
 
-### Déploiement sur la VM
+### Hébergement : décision du 12 novembre 2026
 
-1. Créer une VM Oracle Cloud Always Free (Ampere A1, arm64, 4 cœurs et 24 Go au plus dans l’offre gratuite, **à vérifier** au moment de la création). Ouvrir seulement les ports 80 et 443.
-2. Installer Docker, Node 24, pnpm et `unzip`. Cloner le dépôt, puis lancer `pnpm install --frozen-lockfile`.
-3. Créer `apps/engine/.env` avec `ENGINE_SECRET` (`openssl rand -hex 32`) et `ENGINE_DOMAIN`. Sans domaine, utiliser `<ip-avec-tirets>.sslip.io`, gratuit et sans compte.
-4. Lancer `scripts/engine/refresh-snapshot.sh`, puis `docker compose -f apps/engine/compose.yaml --profile https up -d --build`. Vérifier `https://<domaine>/health`.
-5. Ajouter le script au cron, tous les jours à 18 h 30. La compilation demande environ 1,1 Go de mémoire.
-6. Dans Supabase : `supabase secrets set ENGINE_URL=https://<domaine> ENGINE_SECRET=<secret> TRANSIT_PROVIDER=engine`. Revenir à PRIM : `TRANSIT_PROVIDER=prim`.
-7. Mesurer la latence réelle depuis Supabase avec dix personnes, puis lancer `pnpm engine:import-stations --apply`.
+Oracle Cloud Always Free a refusé l’inscription (carte d’une néobanque). Les offres gratuites restantes ne conviennent pas à une application : mise en veille (Hugging Face, Render, Koyeb), processeur trop faible, ou facturation à l’usage (Google Cloud). Décision : **VPS OVHcloud VPS-2**, prix mensuel fixe, centre de données en France, trafic illimité, sans option payante. Prix au moment de la commande : **à vérifier** sur la facture. 4 vCores permettent aussi le juste milieu automatique, environ 3 s pour dix personnes selon les mesures de la phase 2, **à mesurer** sur la machine.
+
+Besoins mesurés : moins de 250 Mo pour le service à 1 fil, environ 500 Mo à 4 fils, pic de 1,1 Go pendant la compilation, 20 Go de disque suffisent. Le serveur ne garde aucune donnée propre : il se reconstruit à partir du dépôt et du flux GTFS, donc aucune sauvegarde payante n’est nécessaire.
+
+### Déploiement sur le VPS
+
+1. Commander le VPS, Ubuntu 24.04, centre en France, sans option. Se connecter par clé SSH.
+2. Sécuriser : connexion SSH par clé seulement, pare-feu `ufw` ouvert sur 22, 80 et 443, mises à jour de sécurité automatiques (`unattended-upgrades`).
+3. Installer Docker, Node 24, pnpm et `unzip`. Cloner le dépôt dans `/opt/onyva`, puis lancer `pnpm install --frozen-lockfile`.
+4. Créer `apps/engine/.env` avec `ENGINE_SECRET` (`openssl rand -hex 32`) et `ENGINE_DOMAIN`. Sans domaine, utiliser `<ip-avec-tirets>.sslip.io`, gratuit et sans compte.
+5. Lancer `scripts/engine/refresh-snapshot.sh`, puis `docker compose -f apps/engine/compose.yaml --profile https up -d --build`. Vérifier `https://<domaine>/health`.
+6. Ajouter le script au cron, tous les jours à 18 h 30.
+7. Dans Supabase : `supabase secrets set ENGINE_URL=https://<domaine> ENGINE_SECRET=<secret> TRANSIT_PROVIDER=engine`, puis déployer `recommend`. Revenir à PRIM : `TRANSIT_PROVIDER=prim`.
+8. Mesurer la latence réelle depuis Supabase avec dix personnes, puis lancer `pnpm engine:import-stations --apply`.
 
 ## Structure
 
@@ -284,5 +291,5 @@ Commandes : `pnpm engine:build-network [dossierGtfs] [dossierSortie]`, `pnpm eng
 - Phase 0 : terminée. Contrat et décisions validés le 6 novembre 2026.
 - Phase 1 : validée le 10 novembre 2026, fenêtre de 2 h par défaut et valeurs par défaut retenues.
 - Phase 2 : service, image Docker et 20 références PRIM faits. Même quai à 300 s, validé le 10 novembre 2026.
-- Phase 3 : code, tests et essai local faits le 12 novembre 2026. Restent le déploiement de la VM, la mesure depuis Supabase, l’import des stations (`--apply`) et le passage à `TRANSIT_PROVIDER=engine`. PRIM reste le fournisseur actif d’ici là.
+- Phase 3 : code, tests et essai local faits le 12 novembre 2026. Restent le déploiement du VPS OVHcloud, la mesure depuis Supabase, l’import des stations (`--apply`) et le passage à `TRANSIT_PROVIDER=engine`. PRIM reste le fournisseur actif d’ici là.
 - Phases 4 et 5 : à définir. Propositions : perturbations PRIM (décision 1 de la phase 0), puis reprise du juste milieu automatique et retrait du calculateur PRIM.
