@@ -44,7 +44,7 @@ Deno.serve(async (request) => {
       Number.isInteger(dailyLimit) && dailyLimit > 0 && dailyLimit <= 1000000;
     // PRIM stays the provider until the engine is deployed and TRANSIT_PROVIDER=engine is set.
     const provider = Deno.env.get('TRANSIT_PROVIDER') === 'engine' ? 'engine' as const : 'prim' as const;
-    const engine = engineConfig(Deno.env.get('ENGINE_URL'), Deno.env.get('ENGINE_SECRET'));
+    const engine = engineConfig(Deno.env.get('ENGINE_URL'), Deno.env.get('ENGINE_SECRET'), Deno.env.get('ENGINE_THREADS'), Deno.env.get('ENGINE_TIMEOUT_MS'));
     const configured = provider === 'engine' ? engine !== null : primConfigured;
     const enabled = Deno.env.get('RECOMMENDATIONS_ENABLED') !== 'false';
     if ('action' in input.data) {

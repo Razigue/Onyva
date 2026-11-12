@@ -53,6 +53,10 @@ Le moteur maison est documenté dans `docs/engine.md`, phase par phase. `docs/pl
 pnpm install
 pnpm dev                         # aperçu local de l’application
 pnpm dev:all                     # application et invitations en parallèle
+pnpm dev:local                   # pile locale : moteur, fonctions et application sur Supabase local, sans PRIM
+pnpm test:local                  # parcours de bout en bout sur la pile locale
+pnpm local:venues                # lieux OSM de la base locale
+pnpm local:stations              # lignes des stations locales depuis l’instantané
 pnpm --filter mobile start       # build de développement requis pour le GPS en arrière-plan
 pnpm supabase:start
 pnpm supabase:functions

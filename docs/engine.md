@@ -250,6 +250,30 @@ Ce sont des observations ponctuelles en local, sans réseau entre Supabase et la
 
 Import des stations en simulation, catalogue distant, même instantané : 15 381 stations mises à jour (lignes), 4 ajouts valides, 22 stations GTFS hors des limites de l’Île-de-France du schéma `stationSchema` (ignorées), 1 station active sans desserte GTFS (`stop_area:IDFM:60142`, signalée, laissée active). Rien n’a été écrit.
 
+### Pile locale, 12 novembre 2026
+
+En attendant l’hébergement, toute la chaîne tourne en local, sans PRIM ni projet distant :
+
+```bash
+pnpm supabase:start
+pnpm local:venues      # lieux OSM de la base locale, horaires sur 16 jours (à refaire au-delà de 8 jours)
+pnpm local:stations    # lignes des stations locales depuis l’instantané
+pnpm dev:local         # moteur, fonctions et application web sur http://localhost:8082
+pnpm test:local        # dans un autre terminal : création, adhésion, lieu choisi, 2 puis 10 personnes
+```
+
+- `scripts/local-stack.mjs` lance le moteur (secret aléatoire à chaque démarrage), `supabase functions serve` avec `TRANSIT_PROVIDER=engine`, et l’application web. Ctrl+C arrête tout.
+- Expo fusionne toujours les fichiers `.env*` de l’application par-dessus les variables du processus en développement. Le lanceur écrit donc `apps/mobile/.env.development.local`, le fichier le plus prioritaire, avec l’adresse du Supabase local, et le supprime à l’arrêt. Tes fichiers `.env` ne sont pas modifiés. Sans ce fichier, `pnpm dev` vise de nouveau le projet distant.
+- `scripts/check-local-engine.ts` crée des comptes temporaires, puis les supprime à la fin.
+
+Résultat sur la machine des phases 1 et 2, chargée par Docker, Metro et un navigateur : lieu choisi vérifié en environ 2,3 s pour 2 et pour 10 personnes, par le moteur, sans appel PRIM.
+
+### Limite trouvée : le juste milieu dépasse le budget processeur des Edge Functions
+
+`pnpm dev:local --auto` active la recherche automatique. Les dix isochrones aboutissent : la fonction n’en envoie jamais plus à la fois que le moteur n’a de fils (`ENGINE_THREADS`), et `ENGINE_TIMEOUT_MS` passe à 20 s sur cette machine de développement, 5 s par défaut. Mais la fonction est ensuite arrêtée par « CPU time hard limit ». Chaque isochrone du moteur renvoie toutes les stations atteignables, environ 15 000, contre 1 000 au plus avec PRIM. Valider, décoder et croiser dix listes de cette taille dépasse le temps processeur d’une Edge Function (2 s sur l’offre Supabase actuelle, **à vérifier** pour la production).
+
+Le mode actuel, lieu choisi, n’est pas concerné. Piste pour la phase 5 : faire le classement des stations dans le moteur, par une route qui reçoit les départs et renvoie seulement les meilleures stations, avec les règles de `packages/fairness`. La fonction ne recevrait plus qu’une vingtaine de stations.
+
 ### Hébergement : décision du 12 novembre 2026
 
 Oracle Cloud Always Free a refusé l’inscription (carte d’une néobanque). Les offres gratuites restantes ne conviennent pas à une application : mise en veille (Hugging Face, Render, Koyeb), processeur trop faible, ou facturation à l’usage (Google Cloud). Décision : **VPS OVHcloud VPS-2**, prix mensuel fixe, centre de données en France, trafic illimité, sans option payante. Prix au moment de la commande : **à vérifier** sur la facture. 4 vCores permettent aussi le juste milieu automatique, environ 3 s pour dix personnes selon les mesures de la phase 2, **à mesurer** sur la machine.
@@ -292,4 +316,4 @@ Commandes : `pnpm engine:build-network [dossierGtfs] [dossierSortie]`, `pnpm eng
 - Phase 1 : validée le 10 novembre 2026, fenêtre de 2 h par défaut et valeurs par défaut retenues.
 - Phase 2 : service, image Docker et 20 références PRIM faits. Même quai à 300 s, validé le 10 novembre 2026.
 - Phase 3 : code, tests et essai local faits le 12 novembre 2026. Restent le déploiement du VPS OVHcloud, la mesure depuis Supabase, l’import des stations (`--apply`) et le passage à `TRANSIT_PROVIDER=engine`. PRIM reste le fournisseur actif d’ici là.
-- Phases 4 et 5 : à définir. Propositions : perturbations PRIM (décision 1 de la phase 0), puis reprise du juste milieu automatique et retrait du calculateur PRIM.
+- Phases 4 et 5 : à définir. Propositions : perturbations PRIM (décision 1 de la phase 0), puis reprise du juste milieu automatique (classement des stations dans le moteur, voir la limite trouvée en phase 3) et retrait du calculateur PRIM.

@@ -2,6 +2,7 @@
 // SIGHUP reloads the newest snapshot: the new pool is ready before it replaces the old one, which drains then stops.
 import { availableParallelism } from 'node:os';
 import { z } from 'zod';
+import { ENGINE_LIMITS } from '@onyva/shared/engine';
 import { EnginePool } from './pool.ts';
 import { createEngineServer } from './server.ts';
 import type { EngineState } from './server.ts';
@@ -13,6 +14,8 @@ const config = z.object({
   ENGINE_PORT: z.coerce.number().int().min(1).max(65_535).default(8787),
   ENGINE_SNAPSHOT: z.string().default('data/engine'),
   ENGINE_THREADS: z.coerce.number().int().min(1).max(64).default(Math.min(4, availableParallelism())),
+  // Deadline per request, queue included. 5 s in production; a loaded development machine may need more.
+  ENGINE_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(ENGINE_LIMITS.requestTimeoutMs),
 }).parse(process.env);
 
 let state: EngineState | null = null;
@@ -29,7 +32,7 @@ async function load() {
   await previous?.pool.close();
 }
 
-const server = createEngineServer({ secret: config.ENGINE_SECRET, state: () => state });
+const server = createEngineServer({ secret: config.ENGINE_SECRET, state: () => state, requestTimeoutMs: config.ENGINE_TIMEOUT_MS });
 server.listen(config.ENGINE_PORT, config.ENGINE_HOST, () => console.info(JSON.stringify({ event: 'listening', host: config.ENGINE_HOST, port: config.ENGINE_PORT })));
 // /health answers 503 until the first snapshot is loaded.
 await load();

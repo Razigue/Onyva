@@ -101,7 +101,11 @@ describe('engine provider, end to end on a synthetic network', () => {
 
 describe('engine client', () => {
   it('accepts HTTPS, or HTTP on the same machine, with a long secret only', () => {
-    expect(engineConfig('https://engine.example.org/', SECRET)).toEqual({ url: 'https://engine.example.org', secret: SECRET });
+    expect(engineConfig('https://engine.example.org/', SECRET)).toEqual({ url: 'https://engine.example.org', secret: SECRET, concurrency: 4, timeoutMs: 5000 });
+    expect(engineConfig('https://engine.example.org/', SECRET, '4', '20000')?.timeoutMs).toBe(20000);
+    expect(engineConfig('https://engine.example.org/', SECRET, '4', '999999')?.timeoutMs).toBe(5000);
+    expect(engineConfig('https://engine.example.org/', SECRET, '2')?.concurrency).toBe(2);
+    expect(engineConfig('https://engine.example.org/', SECRET, 'x')?.concurrency).toBe(4);
     expect(engineConfig('http://127.0.0.1:8787', SECRET)).not.toBeNull();
     expect(engineConfig('http://engine.example.org', SECRET)).toBeNull();
     expect(engineConfig('https://engine.example.org', 'short')).toBeNull();
@@ -125,6 +129,18 @@ describe('engine client', () => {
     expect(first).toContainEqual({ stationId: id('3'), duration: 25 * 60 });
     expect(await client.oneToAll(id('1'), paris(MONDAY, '08:25'))).toEqual(first);
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('never sends more isochrones at once than the engine has threads', async () => {
+    let running = 0, peak = 0;
+    const send = vi.fn<typeof fetch>(async (input, init) => {
+      running++; peak = Math.max(peak, running);
+      try { return await fetch(input, init); } finally { running--; }
+    });
+    const client = createEngineClient({ url: base, secret: SECRET, concurrency: 2 }, null, send);
+    await Promise.all(['1', '2', '3', '1', '2'].map((station, i) => client.oneToAll(id(station), paris(MONDAY, '08:25') + i)));
+    expect(send).toHaveBeenCalledTimes(5);
+    expect(peak).toBe(2);
   });
 
   it('reports a journey only possible on demand', async () => {
