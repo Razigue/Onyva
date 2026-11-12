@@ -5,30 +5,118 @@ import {
   shortlistVenues,
   verifiedRecommendation,
 } from '../../../packages/fairness/src/prim.ts';
+import type { StationTimes } from '../../../packages/fairness/src/prim.ts';
+import { venueJourney } from '../../../packages/fairness/src/engine.ts';
 import type {
   Outing,
+  Participant,
+  Recommendation,
   RecommendationResponse,
   Station,
   Venue,
 } from '../../../packages/shared/src/index.ts';
 import type { createPrimClient } from './prim-client.ts';
+import type { EngineClient } from './engine-client.ts';
+import { TransitError } from './engine-client.ts';
+
+/** Times of one outing, in Unix seconds. */
+export type OutingWindow = { startsAt: number; endsAt: number };
+export type StationLookup = (id: string) => Station;
+export type VenueCheck = { journeys: Recommendation['journeys']; onDemandOnly: boolean };
+/** Journey provider: PRIM during the transition, then the transit engine. */
+export type TransitRouter = {
+  source: RecommendationResponse['source'];
+  /** Warnings shown with every completed result of this provider. */
+  notes: string[];
+  isochrone: (person: Participant, window: OutingWindow, station: StationLookup) => Promise<StationTimes>;
+  /** Outbound by the start and return after the end, for every participant. Missing journeys are left out. */
+  verify: (venue: Venue, participants: Participant[], window: OutingWindow, station: StationLookup) => Promise<VenueCheck>;
+};
 export type RecommendationServices = {
-  prim: ReturnType<typeof createPrimClient>;
+  router: TransitRouter;
   stations: () => Promise<Station[]>;
   venues: (stationIds: string[]) => Promise<Venue[]>;
   save: (result: RecommendationResponse) => Promise<boolean>;
 };
+
+const coordinates = (station: Station) => `${station.longitude};${station.latitude}`;
+
+export function primRouter(prim: ReturnType<typeof createPrimClient>, now = Date.now()): TransitRouter {
+  const freshness = (at: number) => at * 1000 - now <= 2 * 3600_000 ? 'realtime' as const : 'base_schedule' as const;
+  const iso = (at: number) => new Date(at * 1000).toISOString();
+  return {
+    source: 'prim',
+    notes: [],
+    isochrone: (person, window, station) =>
+      prim.isochrone(coordinates(station(person.departureId)), iso(window.startsAt), freshness(window.startsAt)),
+    async verify(venue, participants, window, station) {
+      const venueRef = `${venue.longitude};${venue.latitude}`;
+      const journeys = await Promise.all(participants.map(async (person) => {
+        const [outboundRaw, inboundRaw] = await Promise.all([
+          prim.journey(coordinates(station(person.departureId)), venueRef, iso(window.startsAt), 'arrival', freshness(window.startsAt)),
+          prim.journey(venueRef, coordinates(station(person.returnId)), iso(window.endsAt), 'departure', freshness(window.endsAt)),
+        ]);
+        const outbound = readJourney(outboundRaw, window.startsAt, 'arrival'),
+          inbound = readJourney(inboundRaw, window.endsAt, 'departure');
+        return outbound && inbound ? { participantId: person.id, outbound, inbound } : null;
+      }));
+      return { journeys: journeys.filter((journey) => journey !== null), onDemandOnly: false };
+    },
+  };
+}
+
+/** Station to station by the engine, the catalogue walk to the venue added on each side. */
+export function engineRouter(engine: EngineClient): TransitRouter {
+  return {
+    source: 'gtfs',
+    notes: ['Horaires théoriques d’Île-de-France Mobilités, sans info trafic pour l’instant. Vérifie ton trajet avant de partir.'],
+    isochrone: (person, window) => engine.oneToAll(person.departureId, window.startsAt),
+    async verify(venue, participants, window) {
+      const answer = await engine.journeys({
+        items: participants.flatMap((person, index) => [
+          { key: `out-${index}`, from: person.departureId, to: venue.stationId, time: window.startsAt - venue.walkSeconds, direction: 'arriveBy' as const },
+          { key: `back-${index}`, from: venue.stationId, to: person.returnId, time: window.endsAt + venue.walkSeconds, direction: 'departAfter' as const },
+        ]),
+      });
+      const results = new Map(answer.results.map((result) => [result.key, result]));
+      let onDemandOnly = false;
+      const journeys = participants.flatMap((person, index) => {
+        const out = results.get(`out-${index}`), back = results.get(`back-${index}`);
+        if (out?.status === 'none' && out.reason === 'on-demand-only') onDemandOnly = true;
+        if (back?.status === 'none' && back.reason === 'on-demand-only') onDemandOnly = true;
+        if (out?.status !== 'ok' || back?.status !== 'ok') return [];
+        const outbound = venueJourney(out.journey, venue, window.startsAt, 'arrival'),
+          inbound = venueJourney(back.journey, venue, window.endsAt, 'departure');
+        return outbound && inbound ? [{ participantId: person.id, outbound, inbound }] : [];
+      });
+      return { journeys, onDemandOnly };
+    },
+  };
+}
+
+const ON_DEMAND = 'Un trajet n’existe qu’avec un transport à la demande, sur réservation. Onyva ne peut pas le garantir.';
+function failureMessage(cause: unknown, fallback: string) {
+  if (cause instanceof TransitError) return cause.message;
+  return cause instanceof Error && cause.message.startsWith('Quota PRIM') ? cause.message : fallback;
+}
+function lookup(stations: Station[]): StationLookup {
+  const map = new Map(stations.map((station) => [station.id, station]));
+  return (id) => {
+    const station = map.get(id);
+    if (!station) throw new Error('Station indisponible.');
+    return station;
+  };
+}
+
 export async function calculateRecommendations(
   outing: Outing,
   services: RecommendationServices,
   now = Date.now(),
 ) {
-  const startsAt = Date.parse(outing.startsAt) / 1000, endsAt = Date.parse(outing.endsAt) / 1000;
-  const freshness = Date.parse(outing.startsAt) - now <= 2 * 3600_000
-    ? 'realtime'
-    : 'base_schedule';
+  const window = { startsAt: Date.parse(outing.startsAt) / 1000, endsAt: Date.parse(outing.endsAt) / 1000 };
+  const { router } = services;
   const result: RecommendationResponse = {
-    source: 'prim',
+    source: router.source,
     computedAt: new Date(now).toISOString(),
     recommendations: [],
     warnings: [],
@@ -44,66 +132,33 @@ export async function calculateRecommendations(
     return writes;
   };
   try {
-    const stations = await services.stations(),
-      stationMap = new Map(stations.map((station) => [station.id, station]));
-    const ref = (id: string) => {
-      const station = stationMap.get(id);
-      if (!station) throw new Error('Station indisponible.');
-      return `${station.longitude};${station.latitude}`;
-    };
+    const stations = await services.stations(), station = lookup(stations),
+      known = new Set(stations.map((item) => item.id));
     const isochrones = await Promise.all(outing.participants.map(async (person) => {
-      const times = await services.prim.isochrone(
-        ref(person.departureId),
-        outing.startsAt,
-        freshness,
-      );
+      const times = await router.isochrone(person, window, station);
       result.progress!.completed++;
       await publish();
       return { participantId: person.id, times };
     }));
-    const ranked = rankStations(isochrones).filter((candidate) =>
-      stationMap.has(candidate.stationId)
-    );
+    const ranked = rankStations(isochrones).filter((candidate) => known.has(candidate.stationId));
     result.stationCandidates = ranked.slice(0, 20);
     result.progress = { stage: 'returns', completed: 0, total: 3 };
     await publish();
     const choices = shortlistVenues(
       ranked,
-      await services.venues(ranked.map((station) => station.stationId)),
-      startsAt,
-      endsAt,
+      await services.venues(ranked.map((candidate) => candidate.stationId)),
+      window.startsAt,
+      window.endsAt,
       outing.activity,
     );
     result.progress.total = choices.length;
-    result.stationCandidates = ranked.filter(station => choices.some(venue => venue.stationId === station.stationId)).slice(0, 20);
+    result.stationCandidates = ranked.filter(candidate => choices.some(venue => venue.stationId === candidate.stationId)).slice(0, 20);
     await publish();
+    let onDemandOnly = false;
     await Promise.all(choices.map(async (venue) => {
-      const venueRef = `${venue.longitude};${venue.latitude}`;
-      const journeys = await Promise.all(outing.participants.map(async (person) => {
-        const [outboundRaw, inboundRaw] = await Promise.all([
-          services.prim.journey(
-            ref(person.departureId),
-            venueRef,
-            outing.startsAt,
-            'arrival',
-            freshness,
-          ),
-          services.prim.journey(
-            venueRef,
-            ref(person.returnId),
-            outing.endsAt,
-            'departure',
-            Date.parse(outing.endsAt) - now <= 2 * 3600_000 ? 'realtime' : 'base_schedule',
-          ),
-        ]);
-        const outbound = readJourney(outboundRaw, startsAt, 'arrival'),
-          inbound = readJourney(inboundRaw, endsAt, 'departure');
-        return outbound && inbound ? { participantId: person.id, outbound, inbound } : null;
-      }));
-      const known = journeys.filter((journey): journey is NonNullable<typeof journey> =>
-        journey !== null
-      );
-      const verified = verifiedRecommendation(venue, outing.participants, known);
+      const check = await router.verify(venue, outing.participants, window, station);
+      onDemandOnly ||= check.onDemandOnly;
+      const verified = verifiedRecommendation(venue, outing.participants, check.journeys);
       if (verified) result.recommendations.push(verified);
       result.recommendations.sort((a, b) =>
         compareScores(a, b) || a.venue.id.localeCompare(b.venue.id)
@@ -115,15 +170,15 @@ export async function calculateRecommendations(
     result.warnings = [
       'Présélection par isochrones à l’heure du rendez-vous. Allers à l’arrivée et retours après la soirée vérifiés pour trois lieux au maximum.',
       'Horaires des lieux issus d’OpenStreetMap. Vérifie-les avant de partir.',
+      ...router.notes,
+      ...(onDemandOnly ? [ON_DEMAND] : []),
     ];
     await publish();
     return result;
   } catch (cause) {
     result.progress = { stage: 'failed', completed: 0, total: 0 };
     result.recommendations = [];
-    result.warnings = [cause instanceof Error && cause.message.startsWith('Quota PRIM')
-      ? cause.message
-      : 'Les trajets n’ont pas pu être vérifiés. Réessaie dans un instant.'];
+    result.warnings = [failureMessage(cause, 'Les trajets n’ont pas pu être vérifiés. Réessaie dans un instant.')];
     await publish();
     return result;
   }
@@ -135,8 +190,9 @@ export async function calculateSelectedVenue(
   services: RecommendationServices,
   now = Date.now(),
 ): Promise<RecommendationResponse> {
+  const { router } = services;
   const result: RecommendationResponse = {
-    source: 'prim', computedAt: new Date(now).toISOString(), recommendations: [], warnings: [],
+    source: router.source, computedAt: new Date(now).toISOString(), recommendations: [], warnings: [],
     progress: { stage: 'returns', completed: 0, total: 1 },
   };
   const publish = async () => {
@@ -146,34 +202,21 @@ export async function calculateSelectedVenue(
     const chosen = outing.selectedVenue;
     if (!chosen || outing.participants.length < 2) throw new Error('Choisis un lieu et ajoute un ami.');
     const venue = (await services.venues([chosen.stationId])).find(v => v.id === chosen.id);
-    if (!venue) throw new Error('Ce lieu n’est plus disponible pour ce créneau.');
-    const stations = new Map((await services.stations()).map(s => [s.id, s]));
-    const ref = (id: string) => {
-      const station = stations.get(id);
-      if (!station) throw new Error('Station indisponible.');
-      return `${station.longitude};${station.latitude}`;
-    };
-    const venueRef = `${venue.longitude};${venue.latitude}`;
-    const startsAt = Date.parse(outing.startsAt) / 1000, endsAt = Date.parse(outing.endsAt) / 1000;
+    if (!venue) throw new TransitError('Ce lieu n’est plus disponible pour ce créneau.');
+    const station = lookup(await services.stations());
+    const window = { startsAt: Date.parse(outing.startsAt) / 1000, endsAt: Date.parse(outing.endsAt) / 1000 };
     await publish();
-    const journeys = await Promise.all(outing.participants.map(async person => {
-      const [outboundRaw, inboundRaw] = await Promise.all([
-        services.prim.journey(ref(person.departureId), venueRef, outing.startsAt, 'arrival', Date.parse(outing.startsAt) - now <= 7200000 ? 'realtime' : 'base_schedule'),
-        services.prim.journey(venueRef, ref(person.returnId), outing.endsAt, 'departure', Date.parse(outing.endsAt) - now <= 7200000 ? 'realtime' : 'base_schedule'),
-      ]);
-      const outbound = readJourney(outboundRaw, startsAt, 'arrival');
-      const inbound = readJourney(inboundRaw, endsAt, 'departure');
-      return outbound && inbound ? { participantId: person.id, outbound, inbound } : null;
-    }));
-    const verified = verifiedRecommendation(venue, outing.participants, journeys.filter((j): j is NonNullable<typeof j> => j !== null));
+    const check = await router.verify(venue, outing.participants, window, station);
+    const verified = verifiedRecommendation(venue, outing.participants, check.journeys);
     result.recommendations = verified ? [verified] : [];
     result.progress = { stage: 'complete', completed: 1, total: 1 };
-    result.warnings = ['Lieu choisi manuellement. Aucun calcul du juste milieu.', 'Allers à l’heure du rendez-vous et retours après la fin vérifiés. Horaires OpenStreetMap à confirmer auprès du lieu.'];
-    if (!verified) result.warnings = ['Ce lieu ne permet pas de vérifier l’aller et le retour de tout le groupe. Choisis un autre lieu ou un autre créneau.'];
+    result.warnings = verified
+      ? ['Lieu choisi manuellement. Aucun calcul du juste milieu.', 'Allers à l’heure du rendez-vous et retours après la fin vérifiés. Horaires OpenStreetMap à confirmer auprès du lieu.', ...router.notes]
+      : ['Ce lieu ne permet pas de vérifier l’aller et le retour de tout le groupe. Choisis un autre lieu ou un autre créneau.', ...(check.onDemandOnly ? [ON_DEMAND] : [])];
   } catch (cause) {
     result.progress = { stage: 'failed', completed: 0, total: 1 };
     result.recommendations = [];
-    result.warnings = [cause instanceof Error && (cause.message.startsWith('Quota PRIM') || cause.message.startsWith('Ce lieu')) ? cause.message : 'Les allers et retours n’ont pas pu être vérifiés. Réessaie.'];
+    result.warnings = [failureMessage(cause, 'Les allers et retours n’ont pas pu être vérifiés. Réessaie.')];
   }
   await publish();
   return result;

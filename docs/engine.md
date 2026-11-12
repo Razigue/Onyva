@@ -168,7 +168,7 @@ Ces temps sont du **calcul pur** sur un seul fil. Ils n’incluent ni HTTP ni Su
 
 - Pour dix personnes, `oneToAll` sur 2 h coûte environ 10 s en série sur cette machine. L’objectif de trois secondes demande le parallélisme prévu en phase 2 (un fil par cœur, instantané partagé) et une fenêtre de 2 h. Une fenêtre de 4 h triple le coût pour un gain limité : un trajet de plus de 2 h ne sert pas à choisir un lieu équitable. Proposition : fenêtre de 2 h par défaut.
 - Les trajets détaillés sont rapides : 60 trajets en 1,3 à 1,8 s en série, donc moins d’une demi-seconde sur 4 fils.
-- La mémoire tient sous 250 Mo par processus. Avec 4 fils et un instantané partagé, l’estimation est d’environ 400 à 600 Mo, **à vérifier** en phase 2. L’offre Always Free d’Oracle (ARM) suffirait largement, **à vérifier** sur la machine réelle.
+- La mémoire tient sous 250 Mo par processus. Avec 4 fils et un instantané partagé, l’estimation est d’environ 400 à 600 Mo, **à vérifier** en phase 2. L’offre Always Free d’Oracle (ARM) suffirait largement, **à vérifier** sur la machine réelle. Note du 12 novembre 2026 : Oracle a refusé l’inscription, le moteur part sur un VPS OVHcloud (phase 3).
 - Pistes d’optimisation non faites : arrêter la plage dès que toutes les stations utiles sont fixées, réutiliser un `oneToAll` entre participants partant de la même station, préparer les événements de départ une fois par jour de service.
 
 ## Phase 2 : service `apps/engine`
@@ -215,6 +215,82 @@ Même machine que la phase 1 (Intel Core i5-7300U, 4 cœurs, Node 24.15.0), cett
 - L’objectif d’environ trois secondes pour dix personnes est atteint de justesse en calcul pur sur 4 cœurs anciens. La latence réseau vers la VM et le temps de Supabase s’ajoutent : **à vérifier** en phase 3. Les optimisations de la phase 1 restent possibles si la VM est plus lente.
 - La mémoire tient dans l’estimation de la phase 1 et dans la limite de 1 Go du conteneur.
 
+## Phase 3 : branchement dans Supabase
+
+### Contenu
+
+- `supabase/functions/_shared/engine-client.ts` : client HTTP du moteur. Secret dans l’en-tête `Authorization`, délai de 8 s, réponses validées par les schémas Zod du contrat. HTTPS obligatoire, sauf pour un service sur la machine locale. Toute erreur devient un message montrable : date hors période (« Les horaires sont publiés jusqu’au 9 décembre. Choisis une date plus proche. »), station inconnue, ou service indisponible.
+- `supabase/functions/_shared/recommendation.ts` : les deux calculs (lieu choisi et juste milieu) passent par un fournisseur de trajets, `primRouter` ou `engineRouter`. Les règles d’équité ne changent pas.
+- `packages/fairness/src/engine.ts` : fonction pure `venueJourney`. Le moteur calcule de station à station. La marche estimée du catalogue (5 minutes au plus) est ajoutée de chaque côté, et aucune position de lieu n’est envoyée au moteur. L’aller doit atteindre la station du lieu avant `début - marche`, le retour doit partir de cette station après `fin + marche`. Un trou entre deux portions, une arrivée trop tardive ou une marche de plus de 5 minutes rejettent le trajet.
+- Aller et retour d’un lieu : un seul lot `POST /v1/journeys` de 2 éléments par personne, 20 pour dix personnes. Un `on-demand-only` ajoute l’avertissement « transport à la demande ». Le résultat porte `source: 'gtfs'` et l’avertissement « Horaires théoriques d’Île-de-France Mobilités, sans info trafic pour l’instant ».
+- Isochrones : `POST /v1/one-to-all` à l’heure du rendez-vous, mis en cache 10 minutes dans `prim_cache`, lié à la sortie. Clé : origine et heure d’arrivée. Forme compacte (`<n>:<secondes>`) pour limiter la taille. Les lots de trajets ne sont pas mis en cache : le moteur les calcule en moins d’une seconde, sans quota.
+- `recommend` : `TRANSIT_PROVIDER=engine` active le moteur. Il faut aussi `ENGINE_URL` et `ENGINE_SECRET`. Sans cette variable, PRIM reste le fournisseur. Avec le moteur, l’action `coverage` appelle `GET /v1/meta` : un moteur injoignable désactive le calcul, et la réponse donne `validFrom` et `validUntil`. Aucun appel PRIM ni compteur PRIM n’est utilisé.
+- Création : `timetableLimit` refuse une sortie qui se termine après le dernier jour publié (décision 2 de la phase 0).
+- `scripts/engine/import-stations.ts` (`pnpm engine:import-stations [instantané] [--apply]`) : catalogue depuis l’instantané, sans PRIM. Simulation par défaut. Les stations existantes gardent leur nom (libellé PRIM avec la commune) et leur position. Seules leurs lignes changent : rail d’abord, puis bus dans l’ordre numérique, 10 au plus (`M4`, `RER B`, `T3a`, `38`). Les stations desservies absentes sont ajoutées. Aucune station n’est désactivée.
+- Déploiement : `apps/engine/Caddyfile` et le profil `https` de `compose.yaml` ajoutent Caddy en frontal HTTPS (certificat Let’s Encrypt automatique, corps limité à 300 Ko). `scripts/engine/refresh-snapshot.sh` télécharge le flux, reconstruit l’instantané s’il a changé, garde les deux plus récents et recharge le service par `SIGHUP`.
+
+### Tests
+
+- `packages/fairness/src/engine.test.ts` : marche ajoutée à l’aller et au retour, champs du contrat retirés, refus en cas de retard, de trou ou de marche trop longue, départ depuis la station du lieu, cache compact.
+- `tests/engine-recommendation.test.ts` : service réel lancé sur un réseau **synthétique**, puis client, fournisseur et calcul du lieu choisi de bout en bout. Couvre le lieu vérifié, le retour impossible, la date hors période, la configuration, le mauvais secret, la réutilisation du cache et le transport à la demande.
+- `tests/engine-stations.test.ts` : libellés et ordre des lignes.
+- Les tests PRIM existants passent par `primRouter` sans changement de comportement.
+
+### Essai local du 12 novembre 2026
+
+Supabase local, `recommend` servie par `supabase functions serve` (edge-runtime 1.77.8, Deno 2.1.4) avec `TRANSIT_PROVIDER=engine`, moteur lancé par `pnpm engine:dev` sur l’instantané `1-7999332c62ec`, 4 fils, même machine que les phases 1 et 2. Parcours : création, adhésion, choix d’un lieu, vérification. Pour ce seul essai, la date d’import du catalogue OSM local a été avancée, puis remise à sa valeur, car l’import local date du 2 novembre. Sortie du vendredi 13 novembre, 19 h à 21 h 30.
+
+| Mesure | Résultat |
+| --- | --- |
+| `coverage` | `provider: engine`, `manualReady: true`, période du 10 novembre au 9 décembre |
+| Deux personnes, lieu choisi | résultat complet en 0,8 s |
+| Dix personnes, lieu choisi | résultat complet en 0,4 à 0,7 s sur deux essais, trajet maximum 49 min |
+
+Ce sont des observations ponctuelles en local, sans réseau entre Supabase et la VM. Le juste milieu automatique (`RECOMMENDATIONS_ENABLED`) n’a pas été réactivé.
+
+Import des stations en simulation, catalogue distant, même instantané : 15 381 stations mises à jour (lignes), 4 ajouts valides, 22 stations GTFS hors des limites de l’Île-de-France du schéma `stationSchema` (ignorées), 1 station active sans desserte GTFS (`stop_area:IDFM:60142`, signalée, laissée active). Rien n’a été écrit.
+
+### Pile locale, 12 novembre 2026
+
+En attendant l’hébergement, toute la chaîne tourne en local, sans PRIM ni projet distant :
+
+```bash
+pnpm supabase:start
+pnpm local:venues      # lieux OSM de la base locale, horaires sur 16 jours (à refaire au-delà de 8 jours)
+pnpm local:stations    # lignes des stations locales depuis l’instantané
+pnpm dev:local         # moteur, fonctions et application web sur http://localhost:8082
+pnpm test:local        # dans un autre terminal : création, adhésion, lieu choisi, 2 puis 10 personnes
+```
+
+- `scripts/local-stack.mjs` lance le moteur (secret aléatoire à chaque démarrage), `supabase functions serve` avec `TRANSIT_PROVIDER=engine`, et l’application web. Ctrl+C arrête tout.
+- Expo fusionne toujours les fichiers `.env*` de l’application par-dessus les variables du processus en développement. Le lanceur écrit donc `apps/mobile/.env.development.local`, le fichier le plus prioritaire, avec l’adresse du Supabase local, et le supprime à l’arrêt. Tes fichiers `.env` ne sont pas modifiés. Sans ce fichier, `pnpm dev` vise de nouveau le projet distant.
+- `scripts/check-local-engine.ts` crée des comptes temporaires, puis les supprime à la fin.
+
+Résultat sur la machine des phases 1 et 2, chargée par Docker, Metro et un navigateur : lieu choisi vérifié en environ 2,3 s pour 2 et pour 10 personnes, par le moteur, sans appel PRIM.
+
+### Limite trouvée : le juste milieu dépasse le budget processeur des Edge Functions
+
+`pnpm dev:local --auto` active la recherche automatique. Les dix isochrones aboutissent : la fonction n’en envoie jamais plus à la fois que le moteur n’a de fils (`ENGINE_THREADS`), et `ENGINE_TIMEOUT_MS` passe à 20 s sur cette machine de développement, 5 s par défaut. Mais la fonction est ensuite arrêtée par « CPU time hard limit ». Chaque isochrone du moteur renvoie toutes les stations atteignables, environ 15 000, contre 1 000 au plus avec PRIM. Valider, décoder et croiser dix listes de cette taille dépasse le temps processeur d’une Edge Function (2 s sur l’offre Supabase actuelle, **à vérifier** pour la production).
+
+Le mode actuel, lieu choisi, n’est pas concerné. Piste pour la phase 5 : faire le classement des stations dans le moteur, par une route qui reçoit les départs et renvoie seulement les meilleures stations, avec les règles de `packages/fairness`. La fonction ne recevrait plus qu’une vingtaine de stations.
+
+### Hébergement : décision du 12 novembre 2026
+
+Oracle Cloud Always Free a refusé l’inscription (carte d’une néobanque). Les offres gratuites restantes ne conviennent pas à une application : mise en veille (Hugging Face, Render, Koyeb), processeur trop faible, ou facturation à l’usage (Google Cloud). Décision : **VPS OVHcloud VPS-2**, prix mensuel fixe, centre de données en France, trafic illimité, sans option payante. Prix au moment de la commande : **à vérifier** sur la facture. 4 vCores permettent aussi le juste milieu automatique, environ 3 s pour dix personnes selon les mesures de la phase 2, **à mesurer** sur la machine.
+
+Besoins mesurés : moins de 250 Mo pour le service à 1 fil, environ 500 Mo à 4 fils, pic de 1,1 Go pendant la compilation, 20 Go de disque suffisent. Le serveur ne garde aucune donnée propre : il se reconstruit à partir du dépôt et du flux GTFS, donc aucune sauvegarde payante n’est nécessaire.
+
+### Déploiement sur le VPS
+
+1. Commander le VPS, Ubuntu 24.04, centre en France, sans option. Se connecter par clé SSH.
+2. Sécuriser : connexion SSH par clé seulement, pare-feu `ufw` ouvert sur 22, 80 et 443, mises à jour de sécurité automatiques (`unattended-upgrades`).
+3. Installer Docker, Node 24, pnpm et `unzip`. Cloner le dépôt dans `/opt/onyva`, puis lancer `pnpm install --frozen-lockfile`.
+4. Créer `apps/engine/.env` avec `ENGINE_SECRET` (`openssl rand -hex 32`) et `ENGINE_DOMAIN`. Sans domaine, utiliser `<ip-avec-tirets>.sslip.io`, gratuit et sans compte.
+5. Lancer `scripts/engine/refresh-snapshot.sh`, puis `docker compose -f apps/engine/compose.yaml --profile https up -d --build`. Vérifier `https://<domaine>/health`.
+6. Ajouter le script au cron, tous les jours à 18 h 30.
+7. Dans Supabase : `supabase secrets set ENGINE_URL=https://<domaine> ENGINE_SECRET=<secret> TRANSIT_PROVIDER=engine`, puis déployer `recommend`. Revenir à PRIM : `TRANSIT_PROVIDER=prim`.
+8. Mesurer la latence réelle depuis Supabase avec dix personnes, puis lancer `pnpm engine:import-stations --apply`.
+
 ## Structure
 
 ```
@@ -228,14 +304,16 @@ scripts/
     bench.ts               Mémoire, chargement, oneToAll et journey sur le GTFS réel
     bench-http.ts          Latences HTTP d’un service lancé, scénario à dix personnes
     record-references.ts   20 captures PRIM de référence, réservées dans le compteur partagé
-    import-stations.ts     Prévu (phase 3) : catalogue des stations depuis le GTFS
+    import-stations.ts     Catalogue des stations depuis l’instantané, simulation par défaut
+    refresh-snapshot.sh    Téléchargement du flux, compilation et rechargement, sur la VM
 ```
 
-Commandes : `pnpm engine:build-network [dossierGtfs] [dossierSortie]`, `pnpm engine:bench [instantané] [AAAA-MM-JJ]`, `pnpm engine:dev`, `pnpm engine:bench-http [AAAA-MM-JJ]`, `pnpm engine:record-references [--dry-run]`.
+Commandes : `pnpm engine:build-network [dossierGtfs] [dossierSortie]`, `pnpm engine:bench [instantané] [AAAA-MM-JJ]`, `pnpm engine:dev`, `pnpm engine:bench-http [AAAA-MM-JJ]`, `pnpm engine:record-references [--dry-run]`, `pnpm engine:import-stations [instantané] [--apply]`.
 
 ## État
 
 - Phase 0 : terminée. Contrat et décisions validés le 6 novembre 2026.
 - Phase 1 : validée le 10 novembre 2026, fenêtre de 2 h par défaut et valeurs par défaut retenues.
 - Phase 2 : service, image Docker et 20 références PRIM faits. Même quai à 300 s, validé le 10 novembre 2026.
-- Phases 3 à 5 : à faire. PRIM reste le fournisseur actif jusqu’à la phase 3.
+- Phase 3 : code, tests et essai local faits le 12 novembre 2026. Restent le déploiement du VPS OVHcloud, la mesure depuis Supabase, l’import des stations (`--apply`) et le passage à `TRANSIT_PROVIDER=engine`. PRIM reste le fournisseur actif d’ici là.
+- Phases 4 et 5 : à définir. Propositions : perturbations PRIM (décision 1 de la phase 0), puis reprise du juste milieu automatique (classement des stations dans le moteur, voir la limite trouvée en phase 3) et retrait du calculateur PRIM.

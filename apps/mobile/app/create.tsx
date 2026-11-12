@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { defaultStart } from '@onyva/shared';
+import { defaultStart, timetableLimit } from '@onyva/shared';
 import type { Outing } from '@onyva/shared';
 import { StepHeader } from '../src/components/create/StepHeader';
 import { StepTransition } from '../src/components/create/StepTransition';
@@ -36,6 +36,8 @@ export default function Create() {
     setError('');
     const starts = parisDate(day, time);
     if (!starts || starts.getTime() < Date.now()) { setError('Choisis une date et une heure à venir, à l’heure de Paris.'); return; }
+    const limit = timetableLimit(coverage, new Date(starts.getTime() + duration * 60_000));
+    if (limit) { setError(limit); return; }
     if (step < 2) { go(step + 1); return; }
     if (!stations.some(s => s.id === station)) { setError('Choisis ta station de départ.'); return; }
     if (!(person ?? name).trim()) { setError('Indique ton prénom.'); return; }

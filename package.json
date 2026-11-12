@@ -10,6 +10,10 @@
     "test:e2e": "playwright test",
     "build": "pnpm --filter mobile build && pnpm --filter invite build",
     "dev:all": "pnpm --parallel --filter mobile --filter invite dev",
+    "dev:local": "node scripts/local-stack.mjs",
+    "local:venues": "node scripts/local-stack.mjs venues",
+    "local:stations": "node scripts/local-stack.mjs stations",
+    "test:local": "tsx scripts/check-local-engine.ts",
     "db:push": "supabase db push",
     "live:local:configure": "node scripts/configure-local.mjs",
     "supabase:start": "supabase start --exclude studio,imgproxy,logflare,vector,supavisor",
@@ -28,7 +32,8 @@
     "engine:bench": "node --expose-gc --import tsx scripts/engine/bench.ts",
     "engine:dev": "pnpm --filter @onyva/engine dev",
     "engine:bench-http": "tsx scripts/engine/bench-http.ts",
-    "engine:record-references": "tsx scripts/engine/record-references.ts"
+    "engine:record-references": "tsx scripts/engine/record-references.ts",
+    "engine:import-stations": "tsx scripts/engine/import-stations.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.12",

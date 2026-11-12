@@ -9,7 +9,8 @@ import {
 } from '../../../packages/shared/src/index.ts';
 import type { Database } from '../../../packages/shared/src/generated/database.ts';
 import { createPrimClient } from '../_shared/prim-client.ts';
-import { calculateRecommendations, calculateSelectedVenue } from '../_shared/recommendation.ts';
+import { createEngineClient, engineConfig } from '../_shared/engine-client.ts';
+import { calculateRecommendations, calculateSelectedVenue, engineRouter, primRouter } from '../_shared/recommendation.ts';
 declare const EdgeRuntime: { waitUntil: (work: Promise<unknown>) => void };
 const headers = {
   'Access-Control-Allow-Origin': '*',
@@ -39,11 +40,18 @@ Deno.serve(async (request) => {
     const userLimit = Number.isInteger(configuredUserLimit) && configuredUserLimit > 0
       ? Math.min(configuredUserLimit, dailyLimit)
       : Math.min(100, dailyLimit);
-    const configured = Deno.env.get('PRIM_QUOTA_CONFIRMED') === 'true' && Boolean(key) &&
+    const primConfigured = Deno.env.get('PRIM_QUOTA_CONFIRMED') === 'true' && Boolean(key) &&
       Number.isInteger(dailyLimit) && dailyLimit > 0 && dailyLimit <= 1000000;
+    // PRIM stays the provider until the engine is deployed and TRANSIT_PROVIDER=engine is set.
+    const provider = Deno.env.get('TRANSIT_PROVIDER') === 'engine' ? 'engine' as const : 'prim' as const;
+    const engine = engineConfig(Deno.env.get('ENGINE_URL'), Deno.env.get('ENGINE_SECRET'), Deno.env.get('ENGINE_THREADS'), Deno.env.get('ENGINE_TIMEOUT_MS'));
+    const configured = provider === 'engine' ? engine !== null : primConfigured;
     const enabled = Deno.env.get('RECOMMENDATIONS_ENABLED') !== 'false';
     if ('action' in input.data) {
-      return reply({ ready: configured && enabled, provider: 'prim', quotaVerified: configured, manualReady: configured });
+      if (provider === 'prim') return reply({ ready: configured && enabled, provider, quotaVerified: configured, manualReady: configured });
+      // The coverage check doubles as a health check: an unreachable engine disables the calculation.
+      const meta = engine ? await createEngineClient(engine, null).meta().catch(() => null) : null;
+      return reply({ ready: meta !== null && enabled, provider, quotaVerified: true, manualReady: meta !== null, ...(meta ? { validFrom: meta.validFrom, validUntil: meta.validUntil } : {}) });
     }
     const data = await client.rpc('get_outing', { outing_id: input.data.outingId });
     if (data.error) return reply({ error: 'Sortie introuvable.' }, 404);
@@ -57,7 +65,7 @@ Deno.serve(async (request) => {
       (outing.confirmedVenueId || Date.parse(cached.data.computedAt) > Date.now() - 60_000)
     ) return reply(cached.data);
     if (!configured) {
-      return reply({ error: 'PRIM n’est pas configuré. Vérifie la clé et le quota gratuit.' }, 503);
+      return reply({ error: provider === 'engine' ? 'Le calcul des trajets n’est pas configuré.' : 'PRIM n’est pas configuré. Vérifie la clé et le quota gratuit.' }, 503);
     }
     if (outing.participants.length < 2) return reply({ error: 'Ajoute un ami.' }, 400);
     const admin = createClient<Database>(
@@ -72,7 +80,7 @@ Deno.serve(async (request) => {
     });
     if (claim.error) return reply({ error: 'Calcul indisponible.' }, 503);
     const initial = recommendationResponseSchema.parse({
-      source: 'prim',
+      source: provider === 'engine' ? 'gtfs' : 'prim',
       computedAt: new Date().toISOString(),
       recommendations: [],
       warnings: [],
@@ -91,13 +99,13 @@ Deno.serve(async (request) => {
       return value.data === true;
     };
     await save(initial);
-    const prim = createPrimClient({
-      claim: async (cacheKey) => {
+    const cache = {
+      claim: async (cacheKey: string) => {
         const value = await admin.rpc('claim_prim_cache', { target: outing.id, key: cacheKey });
         if (value.error) throw new Error('Cache indisponible.');
         return value.data;
       },
-      save: async (cacheKey, payload, ttl) => {
+      save: async (cacheKey: string, payload: unknown, ttl: number) => {
         const value = await admin.from('prim_cache').update({
           state: 'ready',
           payload: JSON.parse(JSON.stringify(payload)),
@@ -105,19 +113,24 @@ Deno.serve(async (request) => {
         }).eq('outing_id', outing.id).eq('cache_key', cacheKey);
         if (value.error) throw new Error('Cache indisponible.');
       },
-      reserve: async () => {
-        const value = await admin.rpc('reserve_prim_user_call', {
-          requester: user.data.user.id,
-          daily_limit: dailyLimit,
-          user_limit: userLimit,
-        });
-        if (value.error) throw new Error('Quota indisponible.');
-        return value.data === true;
-      },
-    }, key!);
+    };
+    const router = provider === 'engine'
+      ? engineRouter(createEngineClient(engine!, cache))
+      : primRouter(createPrimClient({
+        ...cache,
+        reserve: async () => {
+          const value = await admin.rpc('reserve_prim_user_call', {
+            requester: user.data.user.id,
+            daily_limit: dailyLimit,
+            user_limit: userLimit,
+          });
+          if (value.error) throw new Error('Quota indisponible.');
+          return value.data === true;
+        },
+      }, key!));
     EdgeRuntime.waitUntil(
       (outing.selectedVenue ? calculateSelectedVenue : calculateRecommendations)(outing, {
-        prim,
+        router,
         save,
         stations: async () => {
           const rows = [];
