@@ -59,11 +59,22 @@ export const primRequestSchema = z.object({
 export type PrimRequest = z.infer<typeof primRequestSchema>;
 export const primCoverageSchema = z.object({
   ready: z.boolean(),
-  provider: z.literal('prim'),
+  provider: z.enum(['prim', 'engine']),
   quotaVerified: z.boolean(),
   manualReady: z.boolean().default(false),
+  /** Engine only: first and last service day of the timetable, Paris dates. No outing outside them. */
+  validFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 export type PrimCoverage = z.infer<typeof primCoverageSchema>;
+/** Message when the outing ends after the last published service day, null otherwise. Never computed for "now" instead. */
+export function timetableLimit(coverage: Pick<PrimCoverage, 'validUntil'> | null, endsAt: Date): string | null {
+  if (!coverage?.validUntil) return null;
+  const endDay = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(endsAt);
+  if (endDay <= coverage.validUntil) return null;
+  const label = new Intl.DateTimeFormat('fr-FR', { timeZone: 'UTC', day: 'numeric', month: 'long' }).format(new Date(`${coverage.validUntil}T00:00:00Z`));
+  return `Les horaires sont publiés jusqu’au ${label}. Choisis une date plus proche.`;
+}
 export const recommendationInvocationSchema = z.union([
   z.object({ outingId: z.string().uuid() }),
   z.object({ action: z.literal('coverage') }),

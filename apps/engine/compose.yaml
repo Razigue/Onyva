@@ -1,7 +1,8 @@
 # Engine service on one machine. Run from apps/engine: docker compose up -d --build
 # ENGINE_SECRET comes from apps/engine/.env (never committed). The snapshot directory is built by
 # `pnpm engine:build-network` and mounted read-only; `docker compose kill -s SIGHUP engine` reloads it.
-# The port listens on the loopback only: the HTTPS front reaching it from Supabase is set up with the deployment.
+# The port listens on the loopback only. On the VM, `docker compose --profile https up -d` adds Caddy,
+# the HTTPS front reached by Supabase, on ENGINE_DOMAIN (see docs/engine.md, phase 3).
 services:
   engine:
     build:
@@ -23,3 +24,29 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+
+  caddy:
+    profiles: [https]
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    depends_on: [engine]
+    environment:
+      ENGINE_DOMAIN: ${ENGINE_DOMAIN:?ENGINE_DOMAIN requis}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  caddy-data:
+  caddy-config:

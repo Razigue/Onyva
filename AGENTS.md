@@ -8,7 +8,7 @@ Onyva est une application Expo iOS et Android qui cherche un lieu de rencontre �
 
 1. L’application parle à Supabase.
 2. Supabase fournit PostgreSQL, PostGIS, Auth anonyme avec Apple et Google facultatifs, Realtime, les Edge Functions et pg_cron.
-3. Transition en cours : les trajets passent de PRIM/Navitia à un moteur maison alimenté par le GTFS IDFM (décision du 6 novembre 2026, voir `docs/engine.md`). Le moteur est un service Node sans état, appelé uniquement par l’Edge Function `recommend` avec un secret partagé. Il peut tourner sur une VM, Oracle Cloud Always Free pour le MVP, sans aucun service payant. PRIM reste le fournisseur actif jusqu’au branchement du moteur.
+3. Transition en cours : les trajets passent de PRIM/Navitia à un moteur maison alimenté par le GTFS IDFM (décision du 6 novembre 2026, voir `docs/engine.md`). Le moteur est un service Node sans état, appelé uniquement par l’Edge Function `recommend` avec un secret partagé. Il peut tourner sur une VM, Oracle Cloud Always Free pour le MVP, sans aucun service payant. Le moteur est branché dans `recommend` derrière `TRANSIT_PROVIDER=engine` ; PRIM reste le fournisseur actif tant que la VM n’est pas déployée.
 4. Une tâche GitHub Actions hebdomadaire importe les lieux depuis l’extrait régional OpenStreetMap, sans Overpass.
 
 Tout doit rester gratuit au départ. Ne jamais ajouter un service payant, une facturation à l’usage ou un dépassement automatique sans accord explicite. Le dépassement d’un quota bloque le service concerné avec un message clair. La gratuité n’est pas une promesse de capacité illimitée.
@@ -29,7 +29,7 @@ packages/
 supabase/
   migrations/              Migrations SQL versionnées, source de vérité de la base
   functions/
-    recommend/             Orchestration PRIM et résultat progressif
+    recommend/             Orchestration PRIM ou moteur (TRANSIT_PROVIDER) et résultat progressif
     location/              Réception HTTP des positions et relais Realtime HTTP
     dispatch-notifications/
     delete-account/
@@ -37,7 +37,7 @@ supabase/
 scripts/
   venues/                  Extraction OSM régionale et import hebdomadaire
   import-stations.ts       Catalogue de stations PRIM, remplacé par scripts/engine/ à terme
-  engine/                  build-network, bench, bench-http, record-references ; import des stations depuis le GTFS prévu
+  engine/                  build-network, bench, bench-http, record-references, import-stations, refresh-snapshot.sh
   generate-db-types.mjs     Génération des types depuis Supabase
 tests/
   database/                RLS, quotas, concurrence et PostGIS
@@ -73,6 +73,7 @@ pnpm engine:bench                 # mémoire et latences sur le GTFS réel
 pnpm engine:dev                   # service moteur local, ENGINE_SECRET requis
 pnpm engine:bench-http            # latences HTTP d’un service lancé
 pnpm engine:record-references     # 20 captures PRIM de référence, --dry-run sans appel
+pnpm engine:import-stations       # catalogue depuis l’instantané, simulation sans --apply
 ```
 
 Avant de terminer : `pnpm lint`, `pnpm typecheck` et `pnpm test` doivent passer. Exécuter aussi les tests SQL si les migrations ou les règles de sécurité changent. Ne jamais modifier une migration déjà appliquée pour faire évoluer le schéma. Ajouter une migration, puis régénérer les types. Ne pas réintroduire Drizzle.

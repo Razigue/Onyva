@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import { calculateRecommendations, calculateSelectedVenue } from '../supabase/functions/_shared/recommendation';
+import { calculateRecommendations, calculateSelectedVenue, primRouter } from '../supabase/functions/_shared/recommendation';
 import type { RecommendationServices } from '../supabase/functions/_shared/recommendation';
+import type { createPrimClient } from '../supabase/functions/_shared/prim-client';
 import type { Outing, RecommendationResponse, Station, Venue } from '@onyva/shared';
 const meeting = '2026-11-02T18:30:00Z', end = '2026-11-02T21:00:00Z';
 const outing: Outing = {
@@ -43,14 +44,7 @@ const venues: Venue[] = Array.from({ length: 4 }, (_, i) => ({
 }));
 function services() {
   const progress: RecommendationResponse[] = [];
-  const result: RecommendationServices = {
-    stations: async () => stations,
-    venues: async () => venues,
-    save: async (value) => {
-      progress.push(structuredClone(value));
-      return true;
-    },
-    prim: {
+  const prim: ReturnType<typeof createPrimClient> = {
       isochrone: vi.fn(async () => [{ stationId: 'meeting', duration: 600 }]),
       journey: vi.fn(async (from, to, at, direction) => {
         const time = Date.parse(at),
@@ -80,12 +74,20 @@ function services() {
           }],
         };
       }),
-    },
   };
-  return { result, progress };
+  const result: RecommendationServices = {
+    stations: async () => stations,
+    venues: async () => venues,
+    save: async (value) => {
+      progress.push(structuredClone(value));
+      return true;
+    },
+    router: primRouter(prim),
+  };
+  return { result, progress, prim };
 }
 it('publishes participant and return progress, then only verified venues', async () => {
-  const { result, progress } = services();
+  const { result, progress, prim } = services();
   const completed = await calculateRecommendations(outing, result, Date.parse(meeting) - 3600000);
   expect(completed.progress?.stage).toBe('complete');
   expect(completed.recommendations).toHaveLength(3);
@@ -94,8 +96,8 @@ it('publishes participant and return progress, then only verified venues', async
   expect(progress.some((p) => p.progress?.stage === 'returns' && p.progress.completed === 1)).toBe(
     true,
   );
-  expect(result.prim.isochrone).toHaveBeenCalledTimes(2);
-  expect(result.prim.journey).toHaveBeenCalledTimes(12);
+  expect(prim.isochrone).toHaveBeenCalledTimes(2);
+  expect(prim.journey).toHaveBeenCalledTimes(12);
   expect(
     completed.recommendations.every((r) =>
       r.journeys.length === 2 && r.journeys.every((j) => j.inbound.duration === 720)
@@ -103,14 +105,14 @@ it('publishes participant and return progress, then only verified venues', async
   ).toBe(true);
 });
 it('stops a superseded calculation before starting detailed verification', async () => {
-  const { result } = services();
+  const { result, prim } = services();
   result.save = async () => false;
   await expect(calculateRecommendations(outing, result)).rejects.toThrow('sortie');
-  expect(result.prim.journey).not.toHaveBeenCalled();
+  expect(prim.journey).not.toHaveBeenCalled();
 });
 it('does not publish a venue when any return has no solution', async () => {
-  const { result } = services(), original = result.prim.journey;
-  result.prim.journey = async (from, to, at, direction, freshness) =>
+  const { result, prim } = services(), original = prim.journey;
+  prim.journey = async (from, to, at, direction, freshness) =>
     direction === 'departure'
       ? { journeys: [], error: { id: 'no_solution' } }
       : original(from, to, at, direction, freshness);
@@ -120,26 +122,26 @@ it('does not publish a venue when any return has no solution', async () => {
 });
 
 it('verifies a manually selected venue without requesting isochrones', async () => {
-  const { result } = services();
+  const { result, prim } = services();
   const completed = await calculateSelectedVenue({ ...outing, selectedVenue: venues[0]! }, result, Date.parse(meeting) - 3600000);
   expect(completed.progress?.stage).toBe('complete');
   expect(completed.recommendations).toHaveLength(1);
-  expect(result.prim.isochrone).not.toHaveBeenCalled();
-  expect(result.prim.journey).toHaveBeenCalledTimes(4);
+  expect(prim.isochrone).not.toHaveBeenCalled();
+  expect(prim.journey).toHaveBeenCalledTimes(4);
   expect(completed.warnings.join(' ')).toContain('Lieu choisi manuellement');
 });
 it('rejects the selected venue when one participant has no return', async () => {
-  const { result } = services();
-  const original = result.prim.journey;
-  result.prim.journey = vi.fn(async (from, to, at, direction, freshness) => direction === 'departure' && to === '2.37;48.87' ? { journeys: [], error: { id: 'no_solution' } } : original(from, to, at, direction, freshness));
+  const { result, prim } = services();
+  const original = prim.journey;
+  prim.journey = vi.fn(async (from, to, at, direction, freshness) => direction === 'departure' && to === '2.37;48.87' ? { journeys: [], error: { id: 'no_solution' } } : original(from, to, at, direction, freshness));
   const completed = await calculateSelectedVenue({ ...outing, selectedVenue: venues[0]! }, result);
   expect(completed.recommendations).toEqual([]);
   expect(completed.progress?.stage).toBe('complete');
 });
 it('does not verify a manual venue that disappeared from the open catalogue', async () => {
-  const { result } = services();
+  const { result, prim } = services();
   result.venues = async () => [];
   const completed = await calculateSelectedVenue({ ...outing, selectedVenue: venues[0]! }, result);
   expect(completed.progress?.stage).toBe('failed');
-  expect(result.prim.journey).not.toHaveBeenCalled();
+  expect(prim.journey).not.toHaveBeenCalled();
 });
