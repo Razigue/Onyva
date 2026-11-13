@@ -12,7 +12,7 @@ import type { EngineState } from '../apps/engine/src/server.ts';
 import { shareSnapshot } from '../apps/engine/src/snapshot.ts';
 import { createEngineClient, engineConfig, TransitError } from '../supabase/functions/_shared/engine-client.ts';
 import type { EngineCache } from '../supabase/functions/_shared/engine-client.ts';
-import { calculateSelectedVenue, engineRouter } from '../supabase/functions/_shared/recommendation.ts';
+import { calculateRecommendations, calculateSelectedVenue, engineRouter } from '../supabase/functions/_shared/recommendation.ts';
 import type { RecommendationServices } from '../supabase/functions/_shared/recommendation.ts';
 
 // Synthetic network: invented stations, lines and times, never the real IDFM network.
@@ -99,6 +99,57 @@ describe('engine provider, end to end on a synthetic network', () => {
   });
 });
 
+describe('fairness ranking inside the engine', () => {
+  const arriveBy = paris(MONDAY, '08:25');
+  const rank = (body: unknown) => fetch(`${base}/v1/rank`, { method: 'POST', headers: { authorization: `Bearer ${SECRET}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  it('orders the targets by maximum, then sum, and skips unknown or unreachable ones', async () => {
+    const client = createEngineClient({ url: base, secret: SECRET }, null);
+    const answer = await client.rank({
+      origins: [{ key: 'a', station: id('1') }, { key: 'b', station: id('2') }],
+      arriveBy, targets: [id('3'), id('2'), id('1'), id('9'), id('404')],
+    });
+    // Station 2: A 25 min (08:00 train), B already there. Station 3: A 25 min, B 15 min. Station 1: B cannot reach it.
+    expect(answer.candidates.map(candidate => [candidate.stationId, candidate.maximum, candidate.sum])).toEqual([
+      [id('2'), 25 * 60, 25 * 60],
+      [id('3'), 25 * 60, 40 * 60],
+    ]);
+    expect(answer.candidates[1]!.durations).toEqual([{ key: 'a', duration: 25 * 60 }, { key: 'b', duration: 15 * 60 }]);
+    expect(answer).toMatchObject({ reachable: 2, unknownTargets: 1 });
+  });
+
+  it('keeps only the requested number of stations', async () => {
+    const body = await (await rank({ origins: [{ key: 'a', station: id('1') }, { key: 'b', station: id('1') }], arriveBy, targets: [id('1'), id('2'), id('3')], limit: 1 })).json();
+    expect(body.candidates).toHaveLength(1);
+    expect(body.candidates[0]).toMatchObject({ stationId: id('1'), maximum: 0 });
+  });
+
+  it('refuses a single origin, duplicate keys or an empty target list', async () => {
+    const origins = [{ key: 'a', station: id('1') }, { key: 'b', station: id('2') }];
+    expect((await rank({ origins: origins.slice(0, 1), arriveBy, targets: [id('3')] })).status).toBe(400);
+    expect((await rank({ origins: [origins[0], { ...origins[1], key: 'a' }], arriveBy, targets: [id('3')] })).status).toBe(400);
+    expect((await rank({ origins, arriveBy, targets: [] })).status).toBe(400);
+    expect((await rank({ origins: [origins[0], { key: 'b', station: id('404') }], arriveBy, targets: [id('3')] })).status).toBe(400);
+  });
+
+  it('finds the fair venue without loading the station catalogue nor any isochrone in the function', async () => {
+    const value = services(), stationsCall = vi.fn(async () => stations);
+    const venueStations = vi.fn(async () => [id('3')]);
+    const result = await calculateRecommendations({ ...outing(['1', '2']), selectedVenue: null }, { ...value, stations: stationsCall, venueStations });
+    expect(result.progress).toEqual({ stage: 'complete', completed: 1, total: 1 });
+    expect(result.recommendations).toHaveLength(1);
+    expect(result.recommendations[0]).toMatchObject({ venue: { id: venue.id }, maximum: 25 * 60, sum: 40 * 60 });
+    expect(result.stationCandidates?.map(candidate => candidate.stationId)).toEqual([id('3')]);
+    expect(stationsCall).not.toHaveBeenCalled();
+    expect(venueStations).toHaveBeenCalledTimes(1);
+  });
+
+  it('ends cleanly when no station has an open venue', async () => {
+    const result = await calculateRecommendations({ ...outing(['1', '2']), selectedVenue: null }, { ...services(), venueStations: async () => [] });
+    expect(result).toMatchObject({ recommendations: [], progress: { stage: 'complete' } });
+  });
+});
+
 describe('engine client', () => {
   it('accepts HTTPS, or HTTP on the same machine, with a long secret only', () => {
     expect(engineConfig('https://engine.example.org/', SECRET)).toEqual({ url: 'https://engine.example.org', secret: SECRET, concurrency: 4, timeoutMs: 5000 });
@@ -145,7 +196,7 @@ describe('engine client', () => {
 
   it('reports a journey only possible on demand', async () => {
     const client = {
-      oneToAll: vi.fn(), meta: vi.fn(),
+      oneToAll: vi.fn(), meta: vi.fn(), rank: vi.fn(),
       journeys: vi.fn(async () => ({ snapshot: 's', results: [
         { key: 'out-0', status: 'none' as const, reason: 'on-demand-only' as const },
         { key: 'back-0', status: 'none' as const, reason: 'no-service' as const },

@@ -3,7 +3,8 @@ import type { Direction, JourneyResult, OneToAllResult } from '@onyva/transit-en
 
 export interface JourneyTaskItem { key: string; from: string; to: string; time: number; direction: Direction }
 export type EngineTask =
-  | { kind: 'oneToAll'; origin: string; arriveBy: number; window?: number; targets?: string[] }
+  // `skipUnknownTargets`: targets missing from the snapshot are left out instead of failing the task (rank route).
+  | { kind: 'oneToAll'; origin: string; arriveBy: number; window?: number; targets?: string[]; skipUnknownTargets?: boolean }
   | { kind: 'journeys'; items: JourneyTaskItem[] };
 export type EngineTaskResult =
   | { kind: 'oneToAll'; result: OneToAllResult }

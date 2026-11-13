@@ -9,11 +9,12 @@ async function scheduleEvening(page: Page) {
   await page.getByRole('button', { name: '19 h 30', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /AAAA-MM-JJ|HH:MM/ })).toHaveCount(0);
 }
-async function createOuting(page: Page, kind = 'Un verre') {
+async function createOuting(page: Page, kind = 'Un verre', filters: string[] = []) {
   await page.goto('/create');
   await scheduleEvening(page);
   await page.getByTestId('wizard-next').click();
   await page.getByText(kind, { exact: true }).click();
+  for (const filter of filters) await page.getByRole('button', { name: filter, exact: true }).click();
   await page.getByTestId('wizard-next').click();
   await page.getByRole('textbox', { name: 'Ton prénom', exact: true }).fill('Sam');
   await pickStation(page, 'Ta station de départ', 'courneuve', 'La Courneuve - 8 Mai 1945 (La Courneuve)');
@@ -110,22 +111,23 @@ test('a slot that has passed has a recoverable error state', async ({ page }) =>
   await expect(page.getByRole('heading', { name: 'Qu’est-ce qui te ferait plaisir ?' })).toBeVisible();
 });
 
-test('automatic dinner results keep twelve venues with cuisine filters and review links', async ({ page }) => {
+test('cuisine and terrace filters chosen at creation drive the search, and the organizer can change them', async ({ page }) => {
   const cuisines: Cuisine[] = ['chinese', 'italian', 'french'];
-  await mockBackend(page, {
+  const backend = await mockBackend(page, {
     automatic: true,
-    recommendations: outing => Array.from({ length: 12 }, (_, i) => ({ venue: venue(i, { kind: 'dinner', cuisines: [cuisines[i % 3]!] }), maximum: 600 + i * 60, sum: 1200 + i * 60, spread: i * 30, journeys: outing.participants.map(person => ({ participantId: person.id, outbound: { departure: 0, arrival: 600, duration: 600, legs: [], night: false }, inbound: { departure: 0, arrival: 600, duration: 600, legs: [], night: false } })) })),
+    recommendations: outing => Array.from({ length: 12 }, (_, i) => ({ venue: venue(i, { kind: 'dinner', cuisines: [cuisines[i % 3]!], outdoorSeating: i < 6 }), maximum: 600 + i * 60, sum: 1200 + i * 60, spread: i * 30, journeys: outing.participants.map(person => ({ participantId: person.id, outbound: { departure: 0, arrival: 600, duration: 600, legs: [], night: false }, inbound: { departure: 0, arrival: 600, duration: 600, legs: [], night: false } })) })),
   });
-  await createOuting(page, 'Un resto');
-  await expect(page.getByText('Il ne manque qu’un ami.')).toBeVisible();
+  await createOuting(page, 'Un resto', ['Chinois']);
+  expect(backend.state.outing?.filters).toEqual({ cuisines: ['chinese'], outdoorSeating: false });
   await addFriend(page);
-  await expect(page.getByText('OpenStreetMap', { exact: true })).toHaveCount(12);
-  await expect(page.getByText('Le plus équilibré', { exact: true })).toHaveCount(1);
-  await page.getByRole('button', { name: 'Chinois', exact: true }).click();
   await expect(page.getByText('OpenStreetMap', { exact: true })).toHaveCount(4);
+  await expect(page.getByText('Le plus équilibré', { exact: true })).toHaveCount(1);
   await page.getByRole('button', { name: 'Tous les restos', exact: true }).click();
   await expect(page.getByText('OpenStreetMap', { exact: true })).toHaveCount(12);
-  await expect(page.getByRole('link', { name: /Consulter les avis Google/ })).toHaveCount(12);
+  await page.getByRole('button', { name: 'Avec terrasse', exact: true }).click();
+  await expect(page.getByText('OpenStreetMap', { exact: true })).toHaveCount(6);
+  expect(backend.state.outing?.filters).toEqual({ cuisines: [], outdoorSeating: true });
+  await expect(page.getByRole('link', { name: /Consulter les avis Google/ })).toHaveCount(6);
   await page.screenshot({ path: `test-results/results-${test.info().project.name}.png`, fullPage: true });
 });
 

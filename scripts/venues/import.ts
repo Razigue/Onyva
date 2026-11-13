@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import type { Database } from '@onyva/shared/database';
-import { openIntervals, parseCuisines } from './hours';
+import { openIntervals, parseCuisines, parseOutdoorSeating } from './hours';
 if (existsSync('.env')) process.loadEnvFile('.env');
 if (process.env.TZ !== 'Europe/Paris') throw new Error('Utilise TZ=Europe/Paris.');
 const path = process.env.OSM_VENUES_FILE;
@@ -46,6 +46,7 @@ for await (const line of createInterface({ input: createReadStream(path), crlfDe
     longitude: item.longitude,
     opening_hours: item.openingHours,
     cuisines: parseCuisines(item.tags),
+    outdoor_seating: parseOutdoorSeating(item.tags),
     open_intervals: item.openingHours ? openIntervals(item.openingHours, from, to) : [],
   });
   if (rows.length === 250) await flush();

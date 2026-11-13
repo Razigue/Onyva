@@ -5,7 +5,7 @@ import {
   shortlistVenues,
   verifiedRecommendation,
 } from '../../../packages/fairness/src/prim.ts';
-import type { StationTimes } from '../../../packages/fairness/src/prim.ts';
+import type { StationScore, StationTimes } from '../../../packages/fairness/src/prim.ts';
 import { venueJourney } from '../../../packages/fairness/src/engine.ts';
 import type {
   Outing,
@@ -29,13 +29,21 @@ export type TransitRouter = {
   /** Warnings shown with every completed result of this provider. */
   notes: string[];
   isochrone: (person: Participant, window: OutingWindow, station: StationLookup) => Promise<StationTimes>;
+  /**
+   * Fairness ranking of `targets` by the provider itself, best first. When present, it replaces the isochrones:
+   * the transit engine answers with about 15 000 stations per isochrone, too much to cross inside an Edge Function.
+   */
+  rank?: (participants: Participant[], window: OutingWindow, targets: string[]) => Promise<StationScore[]>;
   /** Outbound by the start and return after the end, for every participant. Missing journeys are left out. */
   verify: (venue: Venue, participants: Participant[], window: OutingWindow, station: StationLookup) => Promise<VenueCheck>;
 };
 export type RecommendationServices = {
   router: TransitRouter;
   stations: () => Promise<Station[]>;
-  venues: (stationIds: string[]) => Promise<Venue[]>;
+  /** Open venues of the first `stationCount` stations that have one, in the given order (1 by default, 3 at most). */
+  venues: (stationIds: string[], stationCount?: number) => Promise<Venue[]>;
+  /** Active stations with an open venue of the activity during the outing. Required by a provider that ranks. */
+  venueStations?: () => Promise<string[]>;
   save: (result: RecommendationResponse) => Promise<boolean>;
 };
 
@@ -71,6 +79,10 @@ export function engineRouter(engine: EngineClient): TransitRouter {
     source: 'gtfs',
     notes: ['Horaires théoriques d’Île-de-France Mobilités, sans info trafic pour l’instant. Vérifie ton trajet avant de partir.'],
     isochrone: (person, window) => engine.oneToAll(person.departureId, window.startsAt),
+    async rank(participants, window, targets) {
+      const answer = await engine.rank({ origins: participants.map(person => ({ key: person.id, station: person.departureId })), arriveBy: window.startsAt, targets });
+      return answer.candidates.map(({ durations, ...score }) => ({ ...score, times: durations.map(time => ({ participantId: time.key, duration: time.duration })) }));
+    },
     async verify(venue, participants, window) {
       const answer = await engine.journeys({
         items: participants.flatMap((person, index) => [
@@ -132,21 +144,32 @@ export async function calculateRecommendations(
     return writes;
   };
   try {
-    const stations = await services.stations(), station = lookup(stations),
-      known = new Set(stations.map((item) => item.id));
-    const isochrones = await Promise.all(outing.participants.map(async (person) => {
-      const times = await router.isochrone(person, window, station);
-      result.progress!.completed++;
-      await publish();
-      return { participantId: person.id, times };
-    }));
-    const ranked = rankStations(isochrones).filter((candidate) => known.has(candidate.stationId));
+    let ranked: StationScore[];
+    // Station lookup for the PRIM coordinates only: the engine works with station identifiers.
+    let station: StationLookup = () => { throw new Error('Station indisponible.'); };
+    if (router.rank) {
+      if (outing.participants.length < 2 || outing.participants.length > 10) throw new Error('Groupe invalide.');
+      const targets = await services.venueStations?.() ?? [];
+      // No open venue anywhere: nothing to rank, and the engine refuses an empty list.
+      ranked = targets.length ? await router.rank(outing.participants, window, targets) : [];
+      result.progress!.completed = outing.participants.length;
+    } else {
+      const stations = await services.stations(), known = new Set(stations.map((item) => item.id));
+      station = lookup(stations);
+      const isochrones = await Promise.all(outing.participants.map(async (person) => {
+        const times = await router.isochrone(person, window, station);
+        result.progress!.completed++;
+        await publish();
+        return { participantId: person.id, times };
+      }));
+      ranked = rankStations(isochrones).filter((candidate) => known.has(candidate.stationId));
+    }
     result.stationCandidates = ranked.slice(0, 20);
     result.progress = { stage: 'returns', completed: 0, total: 3 };
     await publish();
     const choices = shortlistVenues(
       ranked,
-      await services.venues(ranked.map((candidate) => candidate.stationId)),
+      await services.venues(ranked.map((candidate) => candidate.stationId), 3),
       window.startsAt,
       window.endsAt,
       outing.activity,

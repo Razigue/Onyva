@@ -11,7 +11,12 @@ export const ENGINE_LIMITS = {
   maxWindowSeconds: 4 * 3600,
   maxTargets: 20_000,
   maxJourneyItems: 64,
-  maxBodyBytes: 256 * 1024,
+  /** rank: one origin per participant, the outing limit. */
+  maxRankOrigins: 10,
+  maxRankCandidates: 50,
+  defaultRankCandidates: 20,
+  /** 20 000 targets of about 25 bytes each must fit: rank sends every station with an open venue. */
+  maxBodyBytes: 512 * 1024,
   requestTimeoutMs: 5_000,
 } as const;
 
@@ -34,6 +39,38 @@ export const oneToAllResponseSchema = z.object({
   unreachable: z.number().int().nonnegative(),
 });
 export type OneToAllResponse = z.infer<typeof oneToAllResponseSchema>;
+
+/**
+ * Fairness ranking of candidate stations for a group, done inside the engine so that only the best stations
+ * cross the network. `origins`: one entry per participant, keyed by an opaque value chosen by the caller.
+ * `targets`: stations worth ranking, typically those with an open venue nearby. Unknown targets are skipped and counted.
+ */
+export const rankRequestSchema = z.object({
+  origins: z.array(z.object({ key: z.string().min(1).max(64), station: engineStationIdSchema }).strict())
+    .min(2).max(ENGINE_LIMITS.maxRankOrigins)
+    .refine(origins => new Set(origins.map(origin => origin.key)).size === origins.length, 'Each key must be unique.'),
+  arriveBy: epochSchema,
+  window: z.number().int().min(60).max(ENGINE_LIMITS.maxWindowSeconds).optional(),
+  targets: z.array(engineStationIdSchema).min(1).max(ENGINE_LIMITS.maxTargets),
+  limit: z.number().int().min(1).max(ENGINE_LIMITS.maxRankCandidates).optional(),
+}).strict();
+export type RankRequest = z.infer<typeof rankRequestSchema>;
+export const rankCandidateSchema = z.object({
+  stationId: engineStationIdSchema,
+  maximum: z.number().int().nonnegative(),
+  sum: z.number().int().nonnegative(),
+  spread: z.number().int().nonnegative(),
+  durations: z.array(z.object({ key: z.string(), duration: z.number().int().nonnegative() })),
+});
+export const rankResponseSchema = z.object({
+  snapshot: z.string(),
+  arriveBy: epochSchema,
+  candidates: z.array(rankCandidateSchema).max(ENGINE_LIMITS.maxRankCandidates),
+  /** Targets reached by every origin, before the limit. */
+  reachable: z.number().int().nonnegative(),
+  unknownTargets: z.number().int().nonnegative(),
+});
+export type RankResponse = z.infer<typeof rankResponseSchema>;
 
 export const engineDirectionSchema = z.enum(['arriveBy', 'departAfter']);
 export const journeyItemSchema = z.object({

@@ -16,7 +16,7 @@ class Venues:
         if not (48.1 <= lat <= 49.3 and 1.4 <= lon <= 3.6):
             return
         identifier = entity.orig_id() if kind == 'relation' else entity.id
-        print(json.dumps({'id': f'osm-{kind}-{identifier}', 'name': tags['name'], 'kind': 'dinner' if tags['amenity'] == 'restaurant' else 'coffee' if tags['amenity'] == 'cafe' else 'drinks', 'latitude': lat, 'longitude': lon, 'openingHours': tags.get('opening_hours'), 'tags': {k: v for k, v in tags.items() if k in ('cuisine', 'diet:vegetarian', 'diet:vegan')}}))
+        print(json.dumps({'id': f'osm-{kind}-{identifier}', 'name': tags['name'], 'kind': 'dinner' if tags['amenity'] == 'restaurant' else 'coffee' if tags['amenity'] == 'cafe' else 'drinks', 'latitude': lat, 'longitude': lon, 'openingHours': tags.get('opening_hours'), 'tags': {k: v for k, v in tags.items() if k in ('cuisine', 'diet:vegetarian', 'diet:vegan', 'outdoor_seating')}}))
 
     def node(self, entity):
         if entity.location.valid():

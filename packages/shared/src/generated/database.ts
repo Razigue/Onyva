@@ -21,14 +21,14 @@ export type Database = {
                   ]
                 },"osm_venues": {
                   Row: {
-                    "cuisines": NonNullable<Json>,"id": string,"import_id": string,"imported_at": string,"kind": string,"latitude": number,"longitude": number,"name": string,"open_intervals": NonNullable<Json>,"opening_hours": string | null,"position": unknown
+                    "cuisines": NonNullable<Json>,"id": string,"import_id": string,"imported_at": string,"kind": string,"latitude": number,"longitude": number,"name": string,"open_intervals": NonNullable<Json>,"opening_hours": string | null,"outdoor_seating": boolean | null,"position": unknown
                   }
                   ComputedFields: never
                   Insert: {
-                    "cuisines"?: NonNullable<Json>,"id": string,"import_id": string,"imported_at"?: string,"kind": string,"latitude": number,"longitude": number,"name": string,"open_intervals"?: NonNullable<Json>,"opening_hours"?: string | null,"position"?: never
+                    "cuisines"?: NonNullable<Json>,"id": string,"import_id": string,"imported_at"?: string,"kind": string,"latitude": number,"longitude": number,"name": string,"open_intervals"?: NonNullable<Json>,"opening_hours"?: string | null,"outdoor_seating"?: boolean | null,"position"?: never
                   }
                   Update: {
-                    "cuisines"?: NonNullable<Json>,"id"?: string,"import_id"?: string,"imported_at"?: string,"kind"?: string,"latitude"?: number,"longitude"?: number,"name"?: string,"open_intervals"?: NonNullable<Json>,"opening_hours"?: string | null,"position"?: never
+                    "cuisines"?: NonNullable<Json>,"id"?: string,"import_id"?: string,"imported_at"?: string,"kind"?: string,"latitude"?: number,"longitude"?: number,"name"?: string,"open_intervals"?: NonNullable<Json>,"opening_hours"?: string | null,"outdoor_seating"?: boolean | null,"position"?: never
                   }
                   Relationships: [
                     
@@ -61,14 +61,14 @@ isOneToOne: false
                   ]
                 },"outings": {
                   Row: {
-                    "activity": string,"confirmed_venue_id": string | null,"ends_at": string,"id": string,"invite_code": string,"owner_id": string,"recommendations": Json | null,"selected_venue": Json | null,"short_code": string,"starts_at": string,"updated_at": string
+                    "activity": string,"confirmed_venue_id": string | null,"cuisines": (string)[],"ends_at": string,"id": string,"invite_code": string,"outdoor_seating": boolean,"owner_id": string,"recommendations": Json | null,"selected_venue": Json | null,"short_code": string,"starts_at": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "activity": string,"confirmed_venue_id"?: string | null,"ends_at": string,"id"?: string,"invite_code"?: string,"owner_id": string,"recommendations"?: Json | null,"selected_venue"?: Json | null,"short_code"?: string,"starts_at": string,"updated_at"?: string
+                    "activity": string,"confirmed_venue_id"?: string | null,"cuisines"?: (string)[],"ends_at": string,"id"?: string,"invite_code"?: string,"outdoor_seating"?: boolean,"owner_id": string,"recommendations"?: Json | null,"selected_venue"?: Json | null,"short_code"?: string,"starts_at": string,"updated_at"?: string
                   }
                   Update: {
-                    "activity"?: string,"confirmed_venue_id"?: string | null,"ends_at"?: string,"id"?: string,"invite_code"?: string,"owner_id"?: string,"recommendations"?: Json | null,"selected_venue"?: Json | null,"short_code"?: string,"starts_at"?: string,"updated_at"?: string
+                    "activity"?: string,"confirmed_venue_id"?: string | null,"cuisines"?: (string)[],"ends_at"?: string,"id"?: string,"invite_code"?: string,"outdoor_seating"?: boolean,"owner_id"?: string,"recommendations"?: Json | null,"selected_venue"?: Json | null,"short_code"?: string,"starts_at"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -279,7 +279,7 @@ isOneToOne: false
 { Args: { "station_id": string,"target": string }; Returns: Json
                            },
 "nearby_venues":
-{ Args: { "activity_kind": string,"ends_at_epoch": number,"starts_at_epoch": number,"station_ids": (string)[] }; Returns: Json
+{ Args: { "activity_kind": string,"cuisines"?: (string)[],"ends_at_epoch": number,"outdoor"?: boolean,"starts_at_epoch": number,"station_count"?: number,"station_ids": (string)[] }; Returns: Json
                            },
 "new_short_invite_code":
 { Args: Record<PropertyKey, never>; Returns: string
@@ -308,11 +308,20 @@ isOneToOne: false
 "select_outing_venue":
 { Args: { "station_id": string,"target": string,"venue_id": string }; Returns: Json
                            },
+"set_outing_filters":
+{ Args: { "cuisines": (string)[],"outdoor_seating": boolean,"target": string }; Returns: Json
+                           },
 "set_venue_reaction":
 { Args: { "liked": boolean,"outing_id": string,"venue_id": string }; Returns: Json
                            },
 "unregister_push_token":
 { Args: { "push_token": string }; Returns: undefined
+                           },
+"venue_matches_filter":
+{ Args: { "activity_kind": string,"cuisines": (string)[],"outdoor": boolean,"venue_cuisines": Json,"venue_outdoor": boolean }; Returns: boolean
+                           },
+"venue_station_ids":
+{ Args: { "activity_kind": string,"cuisines"?: (string)[],"ends_at_epoch": number,"outdoor"?: boolean,"starts_at_epoch": number }; Returns: (string)[]
                            }
           }
           Enums: {

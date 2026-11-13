@@ -4,8 +4,9 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { gzipSync } from 'node:zlib';
-import { ENGINE_LIMITS, journeysRequestSchema, oneToAllRequestSchema } from '@onyva/shared/engine';
-import type { EngineError, EngineMeta, JourneysResponse, OneToAllResponse } from '@onyva/shared/engine';
+import { rankStations } from '@onyva/fairness';
+import { ENGINE_LIMITS, journeysRequestSchema, oneToAllRequestSchema, rankRequestSchema } from '@onyva/shared/engine';
+import type { EngineError, EngineMeta, JourneysResponse, OneToAllResponse, RankResponse } from '@onyva/shared/engine';
 import type { EnginePool } from './pool.ts';
 import { TaskError, TaskTimeoutError } from './pool.ts';
 import type { EngineTaskResult } from './protocol.ts';
@@ -68,7 +69,8 @@ function expect<K extends EngineTaskResult['kind']>(result: EngineTaskResult, ki
   return result as Extract<EngineTaskResult, { kind: K }>;
 }
 
-const ROUTES = ['GET /v1/meta', 'POST /v1/one-to-all', 'POST /v1/journeys'];
+const ROUTES = ['GET /v1/meta', 'POST /v1/one-to-all', 'POST /v1/journeys', 'POST /v1/rank'];
+const invalid = (issues: { path: PropertyKey[]; message: string }[]) => fail(400, 'invalid-request', issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '));
 
 export function createEngineServer(options: ServerOptions): Server {
   if (options.secret.length < 32) throw new Error('ENGINE_SECRET must hold at least 32 characters.');
@@ -97,6 +99,29 @@ export function createEngineServer(options: ServerOptions): Server {
     return { snapshot: state.snapshot, results: parts.flatMap(part => expect(part, 'journeys').results) };
   }
 
+  /**
+   * One oneToAll per distinct origin, spread over the threads, then the fairness order of packages/fairness:
+   * maximum, then sum, then spread. Only the best `limit` stations are sent back.
+   */
+  async function rank(body: unknown, deadline: number): Promise<RankResponse> {
+    const parsed = rankRequestSchema.safeParse(body);
+    if (!parsed.success) throw invalid(parsed.error.issues);
+    const state = loaded(), { origins, arriveBy, window, limit } = parsed.data;
+    const targets = [...new Set(parsed.data.targets)];
+    const stations = [...new Set(origins.map(origin => origin.station))];
+    const answers = await Promise.all(stations.map(origin => state.pool.run({ kind: 'oneToAll', origin, arriveBy, window, targets, skipUnknownTargets: true }, deadline - Date.now())));
+    const byStation = new Map(answers.map((answer, i) => [stations[i]!, expect(answer, 'oneToAll').result]));
+    const first = byStation.get(stations[0]!)!;
+    const ranked = rankStations(origins.map(origin => ({ participantId: origin.key, times: byStation.get(origin.station)!.durations })));
+    return {
+      snapshot: state.snapshot, arriveBy, reachable: ranked.length,
+      unknownTargets: targets.length - first.durations.length - first.unreachable,
+      candidates: ranked.slice(0, limit ?? ENGINE_LIMITS.defaultRankCandidates).map(({ stationId, maximum, sum, spread, times }) => ({
+        stationId, maximum, sum, spread, durations: times.map(time => ({ key: time.participantId, duration: time.duration })),
+      })),
+    };
+  }
+
   return createServer((request, response) => {
     const started = performance.now(), deadline = Date.now() + timeoutMs;
     const url = new URL(request.url ?? '/', 'http://engine'), route = `${request.method} ${url.pathname}`;
@@ -113,7 +138,7 @@ export function createEngineServer(options: ServerOptions): Server {
         if (!authorized(request.headers.authorization, expected)) throw fail(401, 'unauthorized', 'Missing or invalid token.');
         if (route === 'GET /v1/meta') { reply(200, loaded().meta); return; }
         const body = await readJson(request);
-        reply(200, route === 'POST /v1/one-to-all' ? await oneToAll(body, deadline) : await journeys(body, deadline));
+        reply(200, route === 'POST /v1/one-to-all' ? await oneToAll(body, deadline) : route === 'POST /v1/rank' ? await rank(body, deadline) : await journeys(body, deadline));
       } catch (error) {
         const http = taskError(error);
         if (http.status === 500) console.error(JSON.stringify({ route, error: error instanceof Error ? error.message : 'unknown' }));

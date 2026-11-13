@@ -90,7 +90,7 @@ Contrat validé le 6 novembre 2026, fenêtre ajustée le 10 novembre. Les schém
 
 ### `POST /v1/one-to-all`
 
-Entrée : `{ origin, arriveBy, window?, targets? }`, avec `window` en secondes (par défaut 2 h, maximum 4 h, décision du 10 novembre 2026) et `targets` facultatif (liste de stations, 20 000 au plus, dans la limite de 256 Ko par corps). Le maximum suit la durée maximale d’un trajet : une fenêtre plus large ne trouverait rien de plus.
+Entrée : `{ origin, arriveBy, window?, targets? }`, avec `window` en secondes (par défaut 2 h, maximum 4 h, décision du 10 novembre 2026) et `targets` facultatif (liste de stations, 20 000 au plus, dans la limite de 512 Ko par corps). Le maximum suit la durée maximale d’un trajet : une fenêtre plus large ne trouverait rien de plus.
 
 Sémantique : pour chaque station cible `s`, `latestDeparture(s)` est la dernière heure de départ depuis `origin`, comprise dans `[arriveBy - window, arriveBy]`, qui permet d’atteindre `s` au plus tard à `arriveBy`. La durée renvoyée vaut `arriveBy - latestDeparture(s)` : elle inclut la marche, l’attente au départ et aux correspondances, et l’éventuelle avance à l’arrivée. Calcul par RAPTOR par plage (rRAPTOR) sur les départs de l’origine, du plus tardif au plus précoce. Résultat sur l’offre théorique, présenté comme tel, jamais comme une garantie.
 
@@ -110,6 +110,16 @@ Chaque portion en transport porte aussi l’identifiant de ligne GTFS et la list
 
 La marche finale vers le lieu reste ajoutée côté Supabase à partir de l’estimation existante, pour qu’aucune position de lieu ne soit nécessaire au moteur. Interface prévue pour un graphe piéton plus tard.
 
+### `POST /v1/rank`
+
+Ajoutée en phase 5. Classement équitable des stations pour un groupe, fait dans le moteur pour que seules les meilleures stations traversent le réseau.
+
+Entrée : `{ origins: [{ key, station }], arriveBy, window?, targets, limit? }`. `origins` : de 2 à 10 entrées, une par personne, `key` opaque et unique choisie par l’appelant. `targets` : stations à classer, 20 000 au plus, en pratique celles qui ont un lieu ouvert. `limit` : 20 par défaut, 50 au plus.
+
+Sémantique : un `oneToAll` par station de départ distincte, réparti sur les fils, puis l’ordre de `packages/fairness` : trajet maximum, puis somme, puis écart. Une station qu’une personne n’atteint pas est exclue. Une cible absente de l’instantané est ignorée et comptée. Une station de départ inconnue renvoie 400.
+
+Sortie : `{ snapshot, arriveBy, candidates: [{ stationId, maximum, sum, spread, durations: [{ key, duration }] }], reachable, unknownTargets }`. Environ 8 Ko pour dix personnes, au lieu de dix listes d’environ 15 000 stations.
+
 ### `GET /v1/meta` et `GET /health`
 
 `meta` : `{ snapshot, feedSha256, validFrom, validUntil, builtAt, stations, trips }`. `health` : 200 seulement quand un instantané est chargé, 503 sinon.
@@ -120,7 +130,7 @@ La marche finale vers le lieu reste ajoutée côté Supabase à partir de l’es
 | --- | --- |
 | 400 | Entrée invalide selon Zod, station inconnue |
 | 401 | Jeton absent ou faux, comparé en temps constant |
-| 413 | Corps au-delà de 256 Ko ou lot au-delà de 64 éléments |
+| 413 | Corps au-delà de 512 Ko ou lot au-delà de 64 éléments |
 | 422 | Date hors de la période de validité, avec `validFrom` et `validUntil` dans la réponse. Jamais de calcul implicite « pour maintenant » |
 | 503 | Instantané non chargé ou rechargement en échec sans version précédente |
 | 504 | Délai maximal dépassé, 5 s par requête, attente dans la file comprise |
@@ -291,6 +301,31 @@ Besoins mesurés : moins de 250 Mo pour le service à 1 fil, environ 500 Mo à 4
 7. Dans Supabase : `supabase secrets set ENGINE_URL=https://<domaine> ENGINE_SECRET=<secret> TRANSIT_PROVIDER=engine`, puis déployer `recommend`. Revenir à PRIM : `TRANSIT_PROVIDER=prim`.
 8. Mesurer la latence réelle depuis Supabase avec dix personnes, puis lancer `pnpm engine:import-stations --apply`.
 
+## Phase 5 : juste milieu calculé dans le moteur
+
+Réponse à la limite trouvée en phase 3. Avec `TRANSIT_PROVIDER=engine`, la recherche automatique de `recommend` ne charge plus les isochrones ni le catalogue des stations :
+
+1. `venue_station_ids` (migration `0016`, réservée au serveur) liste les stations actives qui ont un lieu de l’activité ouvert pendant toute la sortie, à 240 m au plus. Environ 700 à 2 600 stations selon l’activité, 0,5 s en base locale.
+2. `POST /v1/rank` classe ces stations pour le groupe et renvoie les 20 meilleures.
+3. `nearby_venues` (paramètre `station_count`, migration `0017`) renvoie les lieux des trois premières stations de cette liste. La présélection prend un lieu par station, puis les trois lieux sont vérifiés par `POST /v1/journeys`, aller et retour, comme avant.
+
+Le classement ne porte que sur des stations qui ont un lieu ouvert : il ne s’arrête plus sur une station sans lieu. PRIM garde l’ancien chemin, isochrones dans la fonction.
+
+Compromis : le classement n’est pas mis en cache. Un nouvel arrivant change la révision de la sortie et relance les `oneToAll` de tout le groupe. Le moteur n’a pas de quota, seulement du temps processeur sur le VPS. Les verrous de calcul et le résultat récent d’une minute évitent toujours les calculs identiques en parallèle.
+
+### Essai local du 12 novembre 2026
+
+`pnpm dev:local --auto`, puis `pnpm test:local`, même machine que les phases précédentes, chargée par Docker, Metro et un navigateur (charge moyenne de 4 à 5 sur 4 cœurs). Sortie de dix personnes, vendredi 13 novembre, 19 h à 21 h 30, activité `drinks`.
+
+| Mesure | Résultat |
+| --- | --- |
+| Juste milieu à dix, de bout en bout | 10,3 s, premier appel après le démarrage du moteur, lieu vérifié, trajet maximum 39 min |
+| `POST /v1/rank` seul, premier appel | 9,7 s |
+| `POST /v1/rank` seul, appels suivants, 716 cibles `drinks`, mêmes dix départs | 5,3 à 6,5 s sur 3 appels, réponse de 7,6 Ko |
+| Fin de la limite processeur des Edge Functions | plus d’arrêt « CPU time hard limit » |
+
+Lecture : presque tout le temps vient des dix `oneToAll`, déjà mesurés à 2,8 à 3,0 s sur cette machine sans charge en phase 2. Le classement lui-même est négligeable. Avec 4 fils, un appel `rank` à dix personnes dépasse le délai de 5 s du moteur sur une machine chargée : `pnpm dev:local --auto` garde 20 s. Sur le VPS, **à mesurer** ; si le délai de 5 s ne suffit pas, l’élaguer par les cibles dans `oneToAll` est la première piste.
+
 ## Structure
 
 ```
@@ -316,4 +351,5 @@ Commandes : `pnpm engine:build-network [dossierGtfs] [dossierSortie]`, `pnpm eng
 - Phase 1 : validée le 10 novembre 2026, fenêtre de 2 h par défaut et valeurs par défaut retenues.
 - Phase 2 : service, image Docker et 20 références PRIM faits. Même quai à 300 s, validé le 10 novembre 2026.
 - Phase 3 : code, tests et essai local faits le 12 novembre 2026. Restent le déploiement du VPS OVHcloud, la mesure depuis Supabase, l’import des stations (`--apply`) et le passage à `TRANSIT_PROVIDER=engine`. PRIM reste le fournisseur actif d’ici là.
-- Phases 4 et 5 : à définir. Propositions : perturbations PRIM (décision 1 de la phase 0), puis reprise du juste milieu automatique (classement des stations dans le moteur, voir la limite trouvée en phase 3) et retrait du calculateur PRIM.
+- Phase 4 : à définir. Proposition : perturbations PRIM (décision 1 de la phase 0).
+- Phase 5 : classement dans le moteur fait et essayé en local le 12 novembre 2026. Restent la mesure sur le VPS, puis la reprise du juste milieu en production (`RECOMMENDATIONS_ENABLED`) et le retrait du calculateur PRIM.
