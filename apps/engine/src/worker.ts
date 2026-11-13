@@ -8,7 +8,11 @@ if (!port) throw new Error('The engine worker must run in a worker thread.');
 const engine = new TransitEngine(deserializeNetwork((workerData as WorkerInit).bytes));
 
 function run(task: EngineTask): EngineTaskResult {
-  if (task.kind === 'oneToAll') return { kind: 'oneToAll', result: engine.oneToAll(task) };
+  if (task.kind === 'oneToAll') {
+    const { skipUnknownTargets, ...input } = task;
+    const targets = skipUnknownTargets && input.targets ? input.targets.filter(id => engine.hasStation(id)) : input.targets;
+    return { kind: 'oneToAll', result: engine.oneToAll({ ...input, targets }) };
+  }
   return { kind: 'journeys', results: task.items.map(item => ({ key: item.key, ...engine.journey(item) })) };
 }
 

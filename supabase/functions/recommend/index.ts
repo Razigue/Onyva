@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import {
+  noVenueFilter,
   outingSchema,
   recommendationInvocationSchema,
   recommendationResponseSchema,
@@ -128,6 +129,7 @@ Deno.serve(async (request) => {
           return value.data === true;
         },
       }, key!));
+    const filters = outing.filters ?? noVenueFilter;
     EdgeRuntime.waitUntil(
       (outing.selectedVenue ? calculateSelectedVenue : calculateRecommendations)(outing, {
         router,
@@ -145,13 +147,22 @@ Deno.serve(async (request) => {
           }
           return z.array(stationSchema).parse(rows);
         },
-        venues: async (stationIds) => {
+        venues: async (stationIds, stationCount = 1) => {
           const value = await admin.rpc('nearby_venues', {
-            station_ids: stationIds,
+            station_ids: stationIds, station_count: stationCount,
             activity_kind: outing.activity, starts_at_epoch: Date.parse(outing.startsAt)/1000, ends_at_epoch: Date.parse(outing.endsAt)/1000,
+            cuisines: filters.cuisines, outdoor: filters.outdoorSeating,
           });
           if (value.error) throw new Error('Lieux indisponibles.');
           return z.array(venueSchema).parse(value.data);
+        },
+        venueStations: async () => {
+          const value = await admin.rpc('venue_station_ids', {
+            activity_kind: outing.activity, starts_at_epoch: Date.parse(outing.startsAt)/1000, ends_at_epoch: Date.parse(outing.endsAt)/1000,
+            cuisines: filters.cuisines, outdoor: filters.outdoorSeating,
+          });
+          if (value.error) throw new Error('Lieux indisponibles.');
+          return z.array(z.string()).parse(value.data);
         },
       }).catch(() => undefined),
     );

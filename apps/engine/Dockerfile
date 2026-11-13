@@ -10,9 +10,11 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/engine/package.json apps/engine/
 COPY packages/shared/package.json packages/shared/
+COPY packages/fairness/package.json packages/fairness/
 COPY packages/transit-engine/package.json packages/transit-engine/
 RUN pnpm install --frozen-lockfile --ignore-scripts --filter @onyva/engine...
 COPY packages/shared/src packages/shared/src
+COPY packages/fairness/src packages/fairness/src
 COPY packages/transit-engine/src packages/transit-engine/src
 COPY apps/engine/src apps/engine/src
 RUN pnpm --filter @onyva/engine build

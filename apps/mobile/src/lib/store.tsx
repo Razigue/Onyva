@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { z } from 'zod';
 import { isExpired, outingSchema, recommendationResponseSchema, primCoverageSchema, stationSchema, venueSchema, venueReactionsSchema } from '@onyva/shared';
-import type { Outing, RecommendationResponse, Station, VenueReaction, Venue, PrimCoverage } from '@onyva/shared';
+import type { Outing, RecommendationResponse, Station, VenueReaction, Venue, VenueFilter, PrimCoverage } from '@onyva/shared';
 import { ensureSession, supabase } from './supabase';
 
 const cacheKey = 'onyva:current:v1';
@@ -13,7 +13,7 @@ const cacheKey = 'onyva:current:v1';
 const legacyPreviewCacheKey = 'onyva:current:preview:v2';
 const nameKey = 'onyva:name';
 const cacheSchema = z.object({ outing: outingSchema, results: recommendationResponseSchema.nullable() });
-type NewOuting = { startsAt: string; endsAt: string; activity: Outing['activity']; departureId: string };
+type NewOuting = { startsAt: string; endsAt: string; activity: Outing['activity']; departureId: string; filters?: VenueFilter };
 type State = {
   outing: Outing | null; results: RecommendationResponse | null; stations: Station[];
   ready: boolean; busy: boolean; error: string | null; userId: string | null; name: string;
@@ -28,6 +28,8 @@ type State = {
   coverage: PrimCoverage | null;
   findVenues: (stationId: string) => Promise<Venue[]>;
   selectVenue: (venue: Venue) => Promise<void>;
+  /** Organizer only. Clears the selected venue and restarts the search. */
+  setFilters: (filters: VenueFilter) => Promise<void>;
 };
 const Context = createContext<State | null>(null);
 
@@ -219,6 +221,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const next = outingSchema.parse(await rpc('select_outing_venue', { target: outing.id, station_id: venue.stationId, venue_id: venue.id }));
     await compute(next);
   }
+  async function setFilters(filters: VenueFilter) {
+    if (!outing) return;
+    const next = outingSchema.parse(await rpc('set_outing_filters', { target: outing.id, cuisines: filters.cuisines, outdoor_seating: filters.outdoorSeating }));
+    await compute(next);
+  }
   async function saveName(value: string) {
     const trimmed = value.trim().slice(0, 40);
     if (!trimmed) throw new Error('Indique ton prénom.');
@@ -252,7 +259,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ++revision.current; setOuting(null); setResults(null);
     await AsyncStorage.multiRemove([cacheKey, legacyPreviewCacheKey, `${cacheKey}:${userId}`]);
   }
-  return <Context.Provider value={{ outing, results, stations, ready, busy, error, userId, name, anonymous, sessionFailed, saveName, cached, create, add, remove, confirm, refresh, join, clear, setError, reactions, react, openOuting, coverage, findVenues, selectVenue }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ outing, results, stations, ready, busy, error, userId, name, anonymous, sessionFailed, saveName, cached, create, add, remove, confirm, refresh, join, clear, setError, reactions, react, openOuting, coverage, findVenues, selectVenue, setFilters }}>{children}</Context.Provider>;
 }
 
 export function useStore() { const value = useContext(Context); if (!value) throw new Error('StoreProvider is missing'); return value; }

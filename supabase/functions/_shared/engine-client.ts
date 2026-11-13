@@ -4,8 +4,9 @@ import {
   engineMetaSchema,
   journeysResponseSchema,
   oneToAllResponseSchema,
+  rankResponseSchema,
 } from '../../../packages/shared/src/engine.ts';
-import type { EngineMeta, JourneysRequest, JourneysResponse } from '../../../packages/shared/src/engine.ts';
+import type { EngineMeta, JourneysRequest, JourneysResponse, RankRequest, RankResponse } from '../../../packages/shared/src/engine.ts';
 import { packStationTimes, unpackStationTimes } from '../../../packages/fairness/src/engine.ts';
 import type { StationTimes } from '../../../packages/fairness/src/prim.ts';
 
@@ -124,6 +125,11 @@ export function createEngineClient(config: EngineConfig, cache: EngineCache | nu
       });
       return unpackStationTimes(value.times);
     },
+    /**
+     * Fairness ranking done by the engine: only the best stations come back, never the full isochrones.
+     * Not cached: a new participant changes the outing revision and the whole ranking anyway.
+     */
+    rank: (request: RankRequest): Promise<RankResponse> => call('/v1/rank', rankResponseSchema, request),
     /** One batch, 64 items at most. Not cached: the engine answers in a fraction of a second. */
     journeys: (request: JourneysRequest): Promise<JourneysResponse> => call('/v1/journeys', journeysResponseSchema, request),
   };

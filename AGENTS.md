@@ -89,7 +89,7 @@ Avant de terminer : `pnpm lint`, `pnpm typecheck` et `pnpm test` doivent passer.
 - Tout échange entre l’application, les fonctions, PRIM et la base possède un schéma Zod dans `packages/shared`. Valider les entrées. Aucun `any`.
 - Les règles de choix vivent dans `packages/fairness`, sans réseau ni base. Les adaptateurs PRIM restent hors de ce package.
 - L’application n’appelle jamais PRIM directement. Une Edge Function vérifie la session et l’appartenance à la sortie.
-- Une isochrone tabulaire par départ distinct et heure de rendez-vous alimente la présélection. Le classement minimise le trajet maximum, puis la somme, puis l’écart.
+- Une isochrone tabulaire par départ distinct et heure de rendez-vous alimente la présélection. Le classement minimise le trajet maximum, puis la somme, puis l’écart. Avec le moteur, ce classement est fait dans le moteur (`POST /v1/rank`) sur les seules stations qui ont un lieu ouvert, et la fonction ne reçoit que les 20 meilleures stations. Voir la phase 5 de `docs/engine.md`.
 - Les allers à l’heure d’arrivée et les retours après la fin sont vérifiés pour les trois meilleurs lieux présélectionnés. Aucun lieu non vérifié n’est confirmable. Ne pas présenter un polygone isochrone comme un temps exact ni promettre un optimum global non démontré.
 - Cache court en base, lié à la sortie et supprimé en cascade. Clés distinctes selon départ, destination, date, direction et fraîcheur. Les temps déjà calculés sont réutilisés tant qu’ils sont frais. Un nouvel arrivant ne relance pas les isochrones des autres.
 - Les verrous de calcul et le contrôle de révision empêchent les appels concurrents identiques et les résultats obsolètes. Le compteur PRIM est partagé entre les fonctions, pas seulement en mémoire.

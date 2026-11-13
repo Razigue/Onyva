@@ -1,42 +1,37 @@
 import OpeningHours from 'opening_hours';
 import type { Cuisine, Venue } from '@onyva/shared';
 
-const cuisineGroups: Record<string, Cuisine> = {
-  steak_house: 'meat',
-  steak: 'meat',
-  barbecue: 'meat',
-  burger: 'meat',
-  argentinian: 'meat',
-  seafood: 'seafood',
-  fish: 'seafood',
-  fish_and_chips: 'seafood',
-  italian: 'italian',
-  pizza: 'italian',
-  pasta: 'italian',
-  chinese: 'chinese',
-  japanese: 'japanese',
-  sushi: 'japanese',
-  ramen: 'japanese',
-  indian: 'indian',
-  french: 'french',
-  regional: 'french',
-  lebanese: 'middleEastern',
-  turkish: 'middleEastern',
-  persian: 'middleEastern',
-  moroccan: 'middleEastern',
-  vegetarian: 'vegetarian',
-  vegan: 'vegetarian',
+/** OpenStreetMap `cuisine` values to the groups shown in the app. A pizzeria also counts as Italian. */
+const cuisineGroups: Record<string, Cuisine[]> = {
+  steak_house: ['meat'], steak: ['meat'], barbecue: ['meat'], argentinian: ['meat'], grill: ['meat'], chicken: ['meat'],
+  seafood: ['seafood'], fish: ['seafood'], fish_and_chips: ['seafood'],
+  italian: ['italian'], pasta: ['italian'], italian_pizza: ['italian', 'pizza'], pizza: ['pizza', 'italian'],
+  chinese: ['chinese'], cantonese: ['chinese'], sichuan: ['chinese'], dumpling: ['chinese'],
+  japanese: ['japanese'], sushi: ['japanese'], ramen: ['japanese'],
+  asian: ['asian'], thai: ['asian'], vietnamese: ['asian'], korean: ['asian'], cambodian: ['asian'], laotian: ['asian'], malaysian: ['asian'], indonesian: ['asian'], filipino: ['asian'], noodle: ['asian'],
+  indian: ['indian'], pakistani: ['indian'], sri_lankan: ['indian'], nepalese: ['indian'],
+  french: ['french'], regional: ['french'], brasserie: ['french'], bistro: ['french'],
+  crepe: ['crepe'], pancake: ['crepe'], breton: ['crepe'],
+  lebanese: ['middleEastern'], turkish: ['middleEastern'], persian: ['middleEastern'], moroccan: ['middleEastern'], kebab: ['middleEastern'], couscous: ['middleEastern'], algerian: ['middleEastern'], tunisian: ['middleEastern'], syrian: ['middleEastern'],
+  african: ['african'], senegalese: ['african'], ethiopian: ['african'], ivorian: ['african'], cameroonian: ['african'], west_african: ['african'], congolese: ['african'],
+  burger: ['burger'],
+  american: ['americas'], mexican: ['americas'], tex_mex: ['americas'], brazilian: ['americas'], peruvian: ['americas'], latin_american: ['americas'], caribbean: ['americas'], colombian: ['americas'],
+  vegetarian: ['vegetarian'], vegan: ['vegetarian'],
 };
 export function parseCuisines(tags: Record<string, string>): Cuisine[] {
   const cuisines = (tags.cuisine ?? '').toLowerCase().split(';').map((value) => value.trim())
-    .filter(Boolean).map((value) => cuisineGroups[value] ?? 'other');
+    .filter(Boolean).flatMap((value) => cuisineGroups[value] ?? ['other' as const]);
   if (
     ['yes', 'only'].includes(tags['diet:vegetarian'] ?? '') ||
     ['yes', 'only'].includes(tags['diet:vegan'] ?? '')
   ) cuisines.push('vegetarian');
   return [...new Set(cuisines)];
 }
-
+/** OpenStreetMap `outdoor_seating`: null when the tag is missing or not a plain answer. */
+export function parseOutdoorSeating(tags: Record<string, string>): boolean | null {
+  const value = tags.outdoor_seating?.toLowerCase();
+  return value === 'yes' ? true : value === 'no' ? false : null;
+}
 export function distanceMeters(
   a: { latitude: number; longitude: number },
   b: { latitude: number; longitude: number },

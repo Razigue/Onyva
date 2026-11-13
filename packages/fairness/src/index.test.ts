@@ -60,6 +60,19 @@ it('shortlists at most three known-open nearby venues and keeps the station mini
   expect(selected[0]?.id).toBe(venue.id);
   expect(selected.some((v) => v.id === 'closed' || v.id === 'far')).toBe(false);
 });
+it('spreads the shortlist over distinct stations in the minimax order', () => {
+  const venues: Venue[] = [
+    { ...venue, id: 'a-1', stationId: 'station-a', walkSeconds: 60, cuisines: ['french'] },
+    { ...venue, id: 'a-2', stationId: 'station-a', walkSeconds: 90, cuisines: ['italian'] },
+    { ...venue, id: 'b-1', stationId: 'station-b', walkSeconds: 200, cuisines: ['french'] },
+    { ...venue, id: 'b-2', stationId: 'station-b', walkSeconds: 250, cuisines: ['japanese'] },
+  ];
+  // Station a ranks first: its closest venue leads, then station b with a new cuisine, then the best station again.
+  expect(shortlistVenues(scores(), venues, 100, 200, 'dinner').map((v) => v.id)).toEqual(['a-1', 'b-2', 'a-2']);
+  expect(shortlistVenues(scores(), venues.map((v) => ({ ...v, kind: 'drinks' as const })), 100, 200, 'drinks').map((v) => v.id))
+    .toEqual(['a-1', 'b-1', 'a-2']);
+  expect(shortlistVenues(scores(), venues, 100, 200, 'dinner', 2).map((v) => v.stationId)).toEqual(['station-a', 'station-b']);
+});
 const raw = (night = false) =>
   primJourneysSchema.parse({
     journeys: [{

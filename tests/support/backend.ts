@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import type { Outing, Participant, RecommendationResponse, Station, Venue } from '@onyva/shared';
+import type { Outing, Participant, RecommendationResponse, Station, Venue, VenueFilter } from '@onyva/shared';
 
 // Synthetic Supabase backend for browser tests. No real account, PRIM call or venue is involved.
 export const stations: Station[] = [
@@ -40,7 +40,10 @@ export async function mockBackend(page: Page, options: Options = {}) {
     const outing = state.outing;
     const recommendations = outing.selectedVenue
       ? [{ venue: outing.selectedVenue, maximum: 600, sum: 600 * outing.participants.length, spread: 0, journeys: journeys(outing) }]
-      : (options.recommendations?.(outing) ?? []);
+      : (options.recommendations?.(outing) ?? [])
+        // Same rule as the database: a dinner venue matches one of the chosen cuisines, a terrace when asked.
+        .filter(r => !outing.filters?.cuisines.length || outing.activity !== 'dinner' || r.venue.cuisines?.some(c => outing.filters!.cuisines.includes(c)))
+        .filter(r => !outing.filters?.outdoorSeating || r.venue.outdoorSeating === true);
     state.results = { source: 'prim', computedAt: now(), progress: { stage: 'complete', completed: 1, total: 1 }, warnings: ['Réponse synthétique de test.'], recommendations };
     return route.fulfill({ json: state.results });
   });
@@ -51,7 +54,7 @@ export async function mockBackend(page: Page, options: Options = {}) {
     if (path.endsWith('/create_outing')) {
       const { payload } = body;
       const owner: Participant = { id: '00000000-0000-4000-8000-000000000014', userId, name: payload.name, departureId: payload.departureId, returnId: payload.departureId };
-      state.outing = { startsAt: payload.startsAt, endsAt: payload.endsAt, activity: payload.activity, id: '00000000-0000-4000-8000-000000000012', inviteCode: '00000000-0000-4000-8000-000000000013', shortCode: 'ABCD2345', ownerId: userId, mode: 'live', confirmedVenueId: null, selectedVenue: null, updatedAt: now(), participants: [owner] };
+      state.outing = { startsAt: payload.startsAt, endsAt: payload.endsAt, activity: payload.activity, id: '00000000-0000-4000-8000-000000000012', inviteCode: '00000000-0000-4000-8000-000000000013', shortCode: 'ABCD2345', ownerId: userId, mode: 'live', confirmedVenueId: null, selectedVenue: null, updatedAt: now(), participants: [owner], filters: (payload.filters as VenueFilter | undefined) ?? { cuisines: [], outdoorSeating: false } };
       return route.fulfill({ json: state.outing });
     }
     if (path.endsWith('/add_participant') && state.outing) {
@@ -60,6 +63,11 @@ export async function mockBackend(page: Page, options: Options = {}) {
     }
     if (path.endsWith('/list_outing_venues')) return route.fulfill({ json: [venue(0, { kind: state.outing?.activity ?? 'drinks', name: 'Café du rendez-vous' })] });
     if (path.endsWith('/select_outing_venue') && state.outing) return route.fulfill({ json: update({ ...state.outing, selectedVenue: venue(0, { kind: state.outing.activity, name: 'Café du rendez-vous' }) }) });
+    if (path.endsWith('/set_outing_filters') && state.outing) {
+      // Same as the database: new filters clear the selected venue and the saved results.
+      state.results = null;
+      return route.fulfill({ json: update({ ...state.outing, selectedVenue: null, filters: { cuisines: body.cuisines, outdoorSeating: body.outdoor_seating } }) });
+    }
     if (path.endsWith('/confirm_venue') && state.outing) return route.fulfill({ json: update({ ...state.outing, confirmedVenueId: body.venue_id }) });
     if (path.endsWith('/get_recommendations')) return route.fulfill({ json: state.results });
     if (path.endsWith('/get_outing')) return route.fulfill({ json: state.outing });

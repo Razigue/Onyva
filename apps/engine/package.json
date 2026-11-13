@@ -8,6 +8,7 @@
     "start": "node dist/main.mjs"
   },
   "dependencies": {
+    "@onyva/fairness": "workspace:*",
     "@onyva/shared": "workspace:*",
     "@onyva/transit-engine": "workspace:*",
     "zod": "^3.25.76"

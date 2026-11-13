@@ -28,7 +28,7 @@ Une sortie va de la création à l’expiration en sept étapes.
 
 1. **Créer, pour l’organisateur.** Un assistant en quatre écrans, avec progression et retour :
    - Quand : ce soir, demain, ce week-end ou une date, puis l’heure. Jusqu’à trois créneaux soumis au vote si la date n’est pas fixée.
-   - Quoi : un verre, un dîner, un café ou autre chose.
+   - Quoi : un verre, un dîner, un café ou autre chose. Filtres facultatifs : envies de cuisine pour un dîner, terrasse pour un verre, un dîner ou un café.
    - D’où : la station de départ de l’organisateur.
    - Résumé : le lien, le partage natif ou WhatsApp et l’ajout manuel des participants.
 
@@ -111,6 +111,8 @@ Les trajets passent à un moteur maison alimenté par le GTFS IDFM, hébergé gr
 
 OpenStreetMap fournit les établissements et les cuisines documentées ; une cuisine absente reste inconnue. L’import régional hebdomadaire conserve les horaires, calcule leur couverture pour les prochaines sorties et active le nouveau catalogue seulement s’il est complet. Aucun appel direct à Overpass.
 
-Les alternatives de dîner favorisent les cuisines disponibles : viande, poisson, italien, chinois, japonais, indien, français, oriental, végétarien et autres. Tous les lieux respectent les règles d’ouverture et de retour. Le meilleur choix est conservé et l’ordre reste maximum, somme, écart. Les avis Google Maps sont consultables par lien externe ; aucune note ni aucun avis n’est inventé. Google Places exige toujours une autorisation distincte, car sa facturation est à l’usage.
+Les trois lieux proposés sont sur des stations différentes quand c’est possible : le lieu le plus proche de la meilleure station, puis un lieu des deux stations suivantes dans l’ordre d’équité. Le groupe compare ainsi de vraies alternatives, chacune avec ses temps. S’il manque des stations, les places restantes vont aux autres lieux des meilleures stations. Les alternatives de dîner favorisent les cuisines disponibles : viande, poisson, italien, pizza, chinois, japonais, asiatique, indien, français, crêperie, oriental, africain, burger, américain et latino, végétarien et autres. Tous les lieux respectent les règles d’ouverture et de retour. Le meilleur choix est conservé et l’ordre reste maximum, somme, écart. Les avis Google Maps sont consultables par lien externe ; aucune note ni aucun avis n’est inventé. OpenStreetMap ne fournit ni note ni prix : sur l’extrait du 2 novembre 2026, aucun restaurant, bar ou café d’Île-de-France ne porte de tag de prix exploitable. Aucun prix n’est affiché. Google Places exige toujours une autorisation distincte, car sa facturation est à l’usage.
+
+L’organisateur peut restreindre la recherche à une ou plusieurs cuisines, pour un dîner seulement, et aux lieux avec terrasse. Les filtres s’appliquent au classement des stations, aux lieux proposés et au choix manuel. Seuls les lieux dont la cuisine ou la terrasse est renseignée dans OpenStreetMap restent proposés ; l’application le dit. Changer un filtre efface le lieu choisi et relance la recherche. Les autres personnes voient les filtres sans pouvoir les changer.
 
 Il n’existe plus d’essai local avec des trajets simulés. Sans compte, la session anonyme donne accès au parcours complet : stations, lieux réels, trajets PRIM vérifiés et partage. Chaque session a un plafond quotidien d’appels PRIM (`PRIM_USER_DAILY_LIMIT`, 100 par défaut), en plus du plafond partagé. Sans compte relié, supprimer l’application fait perdre l’accès à ses sorties.

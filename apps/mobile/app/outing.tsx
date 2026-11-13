@@ -3,20 +3,19 @@ import { Linking, Platform, Pressable, Share, Text, View, useWindowDimensions } 
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { MapPin } from 'lucide-react-native';
-import { activityLabels, formatTime, venueReviewsUrl } from '@onyva/shared';
-import type { Cuisine } from '@onyva/shared';
+import { activityLabels, formatTime, noVenueFilter, venueReviewsUrl } from '@onyva/shared';
 import LiveVenueMap from '../src/components/LiveVenueMap';
 import ManualVenuePicker from '../src/components/ManualVenuePicker';
+import { FilterSummary, filterSummary, VenueFilters } from '../src/components/VenueFilters';
 import { CalculationSteps } from '../src/components/outing/CalculationSteps';
 import { ConvergenceMark } from '../src/components/outing/ConvergenceMark';
-import { CuisineFilter } from '../src/components/outing/CuisineFilter';
 import { EmptyGroup } from '../src/components/outing/EmptyGroup';
 import { FirstCandidate } from '../src/components/outing/FirstCandidate';
 import { OutingActions } from '../src/components/outing/OutingActions';
 import { OutingHeader } from '../src/components/outing/OutingHeader';
 import { ParticipantList } from '../src/components/outing/ParticipantList';
 import { ResultCard } from '../src/components/outing/ResultCard';
-import { Button, Caption, ConvergenceMotif, cx, EmptyState, Notice, Shell, Skeleton, SkeletonGroup, Subtitle } from '../src/components/ui';
+import { Button, Caption, Card, ConvergenceMotif, cx, EmptyState, Notice, Shell, Skeleton, SkeletonGroup, Subtitle } from '../src/components/ui';
 import { addToCalendar } from '../src/lib/calendar';
 import { tapSuccess } from '../src/lib/haptics';
 import { startTracking, stopTracking } from '../src/lib/location-task';
@@ -31,13 +30,10 @@ export default function OutingScreen() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [cuisine, setCuisine] = useState<Cuisine | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [pushEnabledFor, setPushEnabledFor] = useState<string | null>(null);
   const mapStations = useMemo(() => stations.filter(s => outing?.participants.some(p => p.departureId === s.id)), [stations, outing?.participants]);
-  const availableCuisines = [...new Set(results?.recommendations.flatMap(r => r.venue.cuisines ?? []) ?? [])];
-  const activeCuisine = cuisine && availableCuisines.includes(cuisine) ? cuisine : null;
-  const visibleResults = results?.recommendations.filter(r => !activeCuisine || r.venue.cuisines?.includes(activeCuisine)) ?? [];
+  const visibleResults = results?.recommendations ?? [];
   if (!store.ready) return <Shell><SkeletonGroup label="Chargement de ta sortie">
     <Skeleton width={180} height={14} /><Skeleton width="70%" height={30} /><Skeleton width="50%" height={18} />
     <View className="mt-4 gap-3"><Skeleton height={120} radius={20} /><Skeleton height={220} radius={20} /></View>
@@ -97,17 +93,21 @@ export default function OutingScreen() {
             <MapPin size={16} color={palette.brand} /><Text className="font-sans text-small text-brand">{showMap ? 'Masquer la carte' : 'Voir la carte'}</Text>
           </Pressable>}
         </View>
-        {!confirmed && outing.activity === 'dinner' && !!results?.recommendations.length && <CuisineFilter available={availableCuisines} active={activeCuisine} onChange={setCuisine} />}
         {showMap && <LiveVenueMap outing={outing} stations={mapStations} venues={visibleResults.map(r => r.venue)} />}
         {busy && <CalculationSteps progress={results?.progress} manualChoice={!!outing.selectedVenue} />}
         {busy && !!results?.stationCandidates?.length && !results.recommendations.length && <FirstCandidate candidate={results.stationCandidates[0]!} stations={stations} participants={outing.participants} />}
         {!confirmed && <>
           {coverage?.ready === false && <Notice>La recherche du juste milieu est en pause. L’organisateur peut choisir un lieu et faire vérifier les allers et retours.</Notice>}
+          {canEdit && outing.activity !== 'other' && <Card>
+            <Subtitle>Ce que vous cherchez</Subtitle>
+            <VenueFilters activity={outing.activity} value={outing.filters ?? noVenueFilter} onChange={value => void action(() => store.setFilters(value))} />
+          </Card>}
+          {!canEdit && <FilterSummary activity={outing.activity} value={outing.filters} />}
           {canEdit && <ManualVenuePicker outing={outing} stations={stations} findVenues={store.findVenues} disabled={saving || busy || cached} selectVenue={venue => action(() => store.selectVenue(venue)).then(() => undefined)} />}
           {!canEdit && outing.selectedVenue && !results?.recommendations.length && <Notice>Lieu choisi : {outing.selectedVenue.name}. Les allers et retours restent à vérifier.</Notice>}
         </>}
         {outing.participants.length < 2 && coverage?.ready && <EmptyGroup />}
-        {!busy && results?.progress?.stage === 'complete' && results.recommendations.length === 0 && <EmptyState variant="apart" title="Aucun lieu pour tout le monde">Aucun lieu ne permet de réunir tout le monde avec un retour vérifié. Essaie une sortie plus tôt ou un autre type de lieu.</EmptyState>}
+        {!busy && results?.progress?.stage === 'complete' && results.recommendations.length === 0 && <EmptyState variant="apart" title="Aucun lieu pour tout le monde">{filterSummary(outing.activity, outing.filters) ? 'Aucun lieu qui correspond à vos filtres ne permet de réunir tout le monde avec un retour vérifié. Retire un filtre ou essaie une sortie plus tôt.' : 'Aucun lieu ne permet de réunir tout le monde avec un retour vérifié. Essaie une sortie plus tôt ou un autre type de lieu.'}</EmptyState>}
         {cards.map(recommendation => {
           const id = recommendation.venue.id, votes = store.reactions.filter(r => r.venueId === id), liked = votes.some(r => r.userId === userId);
           return <ResultCard key={id} recommendation={recommendation} index={confirmed ? 0 : results!.recommendations.indexOf(recommendation)} outing={outing} stations={stations}
