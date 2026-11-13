@@ -2,16 +2,31 @@ appId: fr.onyva.app
 ---
 - launchApp:
     clearState: true
-- tapOn: "On organise ça"
+- tapOn: "Organiser"
+# Les valeurs proposées suffisent : « Suivant », « Suivant », « Créer ».
 - tapOn:
     id: "wizard-next"
 - tapOn:
     id: "wizard-next"
+# Aucune station n'est présélectionnée : le catalogue est trop grand pour en choisir une au hasard.
+- tapOn: "Ton prénom"
+- inputText: "Sam"
+- tapOn: "Ta station de départ : Choisir"
+- tapOn: "Rechercher une station"
+- inputText: "Bastille"
+- tapOn: "Bastille"
 - tapOn:
     id: "wizard-next"
-- assertVisible: "Il ne manque qu’un ami."
+- assertVisible: "La bande"
 - tapOn: "Ajouter un ami"
 - tapOn: "Son prénom"
 - inputText: "Ines"
+- tapOn: "Son départ : Choisir"
+- tapOn: "Rechercher une station"
+- inputText: "Nation"
+- tapOn: "Nation"
 - tapOn: "Ajouter au groupe"
-- assertVisible: "Le plus équilibré"
+- assertVisible: "Ines"
+# Lieu choisi à la main tant que la recherche automatique est en pause : jamais « Le plus équilibré ».
+- assertVisible: "Choisir le lieu ensemble"
+- assertNotVisible: "Le plus équilibré"

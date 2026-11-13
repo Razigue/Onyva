@@ -1,0 +1,22 @@
+# HTTPS front of the engine, the only port open to the Internet (443, plus 80 for the certificate).
+# ENGINE_DOMAIN is a name pointing at the VM, for instance <ip-with-dashes>.sslip.io: free, no account.
+# Caddy obtains and renews the Let's Encrypt certificate itself. /health stays public, the API needs the secret.
+{
+	admin off
+}
+
+{$ENGINE_DOMAIN} {
+	encode gzip
+	request_body {
+		max_size 300KB
+	}
+	reverse_proxy engine:8787 {
+		transport http {
+			response_header_timeout 10s
+		}
+	}
+	log {
+		output stdout
+		format json
+	}
+}

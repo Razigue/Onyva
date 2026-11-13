@@ -14,21 +14,31 @@ export const outingSchema = z.object({
   participants: z.array(participantSchema).min(1).max(10), confirmedVenueId: idSchema.nullable(),
   updatedAt: z.string().datetime(), mode: z.literal('live'),
   selectedVenue: z.lazy(() => venueSchema).nullable().optional(),
+  filters: z.lazy(() => venueFilterSchema).optional(),
 }).refine(o => Date.parse(o.endsAt) > Date.parse(o.startsAt), { message: 'La fin doit être après le début.' });
 export type Outing = z.infer<typeof outingSchema>;
-export const createOutingSchema = z.object({ startsAt: z.string().datetime(), endsAt: z.string().datetime(), activity: activitySchema, departureId: idSchema, name: z.string().trim().min(1).max(40) })
+export const createOutingSchema = z.object({ startsAt: z.string().datetime(), endsAt: z.string().datetime(), activity: activitySchema, departureId: idSchema, name: z.string().trim().min(1).max(40), filters: z.lazy(() => venueFilterSchema).optional() })
   .refine(o => Date.parse(o.endsAt) > Date.parse(o.startsAt), { message: 'La fin doit être après le début.' });
 export const joinSchema = z.object({ inviteCode: z.string().min(16).max(100), name: z.string().trim().min(1).max(40), departureId: idSchema, returnId: idSchema });
-export const cuisineSchema = z.enum(['meat', 'seafood', 'italian', 'chinese', 'japanese', 'indian', 'french', 'middleEastern', 'vegetarian', 'other']);
+export const cuisineSchema = z.enum(['meat', 'seafood', 'italian', 'pizza', 'chinese', 'japanese', 'asian', 'indian', 'french', 'crepe', 'middleEastern', 'african', 'burger', 'americas', 'vegetarian', 'other']);
 export type Cuisine = z.infer<typeof cuisineSchema>;
-export const cuisineLabels: Record<Cuisine, string> = { meat: 'Viande et grillades', seafood: 'Poisson et fruits de mer', italian: 'Italien', chinese: 'Chinois', japanese: 'Japonais', indian: 'Indien', french: 'Français', middleEastern: 'Oriental', vegetarian: 'Options végétariennes', other: 'Autres cuisines' };
+export const cuisineLabels: Record<Cuisine, string> = { meat: 'Viande et grillades', seafood: 'Poisson et fruits de mer', italian: 'Italien', pizza: 'Pizza', chinese: 'Chinois', japanese: 'Japonais', asian: 'Thaï, viet, coréen', indian: 'Indien', french: 'Français', crepe: 'Crêperie', middleEastern: 'Oriental', african: 'Africain', burger: 'Burger', americas: 'Américain et latino', vegetarian: 'Options végétariennes', other: 'Autres cuisines' };
+/** Search filters chosen by the organizer. Empty cuisines: every restaurant. A venue matches when it has one of the cuisines. */
+export const venueFilterSchema = z.object({
+  cuisines: z.array(cuisineSchema).max(16).refine(values => new Set(values).size === values.length, 'Cuisine en double.'),
+  outdoorSeating: z.boolean(),
+}).strict();
+export type VenueFilter = z.infer<typeof venueFilterSchema>;
+export const noVenueFilter: VenueFilter = { cuisines: [], outdoorSeating: false };
 export const recommendationLimits = { dinner: 12, drinks: 6, coffee: 6, other: 6 } as const;
 export function venueReviewsUrl(venue: Pick<Venue, 'name' | 'latitude' | 'longitude'>): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${venue.name} ${venue.latitude},${venue.longitude}`)}`;
 }
 export const venueSchema = z.object({
   id: idSchema, name: z.string().min(1), stationId: idSchema, neighborhood: z.string(),
-  kind: activitySchema, cuisines: z.array(cuisineSchema).max(10).optional(), walkSeconds: z.number().int().min(0).max(300),
+  kind: activitySchema, cuisines: z.array(cuisineSchema).max(16).optional(),
+  /** OpenStreetMap `outdoor_seating`: true or false when documented, null when unknown. */
+  outdoorSeating: z.boolean().nullable().optional(), walkSeconds: z.number().int().min(0).max(300),
   longitude: z.number(), latitude: z.number(),
   // Explicit intervals are prepared by the data adapter, never guessed by the engine.
   openIntervals: z.array(z.object({ start: z.number(), end: z.number() })),

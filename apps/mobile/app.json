@@ -40,7 +40,9 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-font"
     ]
   }
 }

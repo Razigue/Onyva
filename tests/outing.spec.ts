@@ -3,17 +3,18 @@ import type { Page } from '@playwright/test';
 import type { Cuisine } from '@onyva/shared';
 import { mockBackend, pickStation, venue } from './support/backend';
 
+// No typing: the day and the time are chosen by touch.
 async function scheduleEvening(page: Page) {
-  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-  const tomorrow = new Date(Date.parse(`${today}T12:00:00Z`) + 86400_000).toISOString().slice(0, 10);
-  await page.getByRole('textbox', { name: 'Date (AAAA-MM-JJ)', exact: true }).fill(tomorrow);
-  await page.getByRole('textbox', { name: 'Heure de Paris (HH:MM)', exact: true }).fill('19:30');
+  await page.getByRole('button', { name: 'Demain', exact: true }).click();
+  await page.getByRole('button', { name: '19 h 30', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: /AAAA-MM-JJ|HH:MM/ })).toHaveCount(0);
 }
-async function createOuting(page: Page, kind = 'Un verre') {
+async function createOuting(page: Page, kind = 'Un verre', filters: string[] = []) {
   await page.goto('/create');
   await scheduleEvening(page);
   await page.getByTestId('wizard-next').click();
   await page.getByText(kind, { exact: true }).click();
+  for (const filter of filters) await page.getByRole('button', { name: filter, exact: true }).click();
   await page.getByTestId('wizard-next').click();
   await page.getByRole('textbox', { name: 'Ton prénom', exact: true }).fill('Sam');
   await pickStation(page, 'Ta station de départ', 'courneuve', 'La Courneuve - 8 Mai 1945 (La Courneuve)');
@@ -32,9 +33,10 @@ test('an outing is created, shared, checked and confirmed without any account', 
   page.on('pageerror', error => errors.push(error.message));
   const backend = await mockBackend(page);
   await page.goto('/');
-  await expect(page.getByText('On se retrouve', { exact: false }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'On sort quand ?' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'J’ai un code', exact: true })).toBeVisible();
   await page.screenshot({ path: `test-results/home-${test.info().project.name}.png`, fullPage: true });
-  await page.getByRole('button', { name: 'On organise ça' }).click();
+  await page.getByRole('button', { name: 'Organiser', exact: true }).click();
   await scheduleEvening(page);
   await page.getByTestId('wizard-next').click();
   await page.getByTestId('wizard-next').click();
@@ -69,6 +71,9 @@ test('an outing is created, shared, checked and confirmed without any account', 
   expect(backend.state.anonymousSignups).toBe(1);
   await page.context().setOffline(true);
   await page.getByRole('link', { name: 'À la une', exact: true }).click();
+  await expect(page.getByText('TA PROCHAINE SORTIE', { exact: true })).toBeVisible();
+  await expect(page.getByText('Confirmée', { exact: true })).toBeVisible();
+  await page.screenshot({ path: `test-results/home-outing-${test.info().project.name}.png`, fullPage: true });
   await page.getByRole('link', { name: 'Ma sortie', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'C’est décidé. On y va !' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ajouter un ami', exact: true })).toHaveCount(0);
@@ -90,30 +95,39 @@ test('former local trials with simulated journeys are discarded', async ({ page 
   await expect.poll(() => page.evaluate(() => [localStorage.getItem('onyva:current:preview:v2'), localStorage.getItem('onyva:current:v1')])).toEqual([null, null]);
 });
 
-test('an invalid date has a recoverable error state', async ({ page }) => {
+test('a slot that has passed has a recoverable error state', async ({ page }) => {
+  // Thursday 12 November 2026, 16:50 in Paris: 18 h is the first slot at least one hour ahead.
+  await page.clock.install({ time: new Date('2026-11-12T15:50:00Z') });
   await mockBackend(page);
   await page.goto('/create');
-  await page.getByRole('textbox', { name: 'Date (AAAA-MM-JJ)', exact: true }).fill('2020-01-01');
+  await page.getByRole('button', { name: 'Ce soir', exact: true }).click();
+  await page.getByRole('button', { name: '18 h', exact: true }).click();
+  await page.screenshot({ path: `test-results/create-when-${test.info().project.name}.png`, fullPage: true });
+  await page.clock.fastForward('02:00:00');
   await page.getByTestId('wizard-next').click();
   await expect(page.getByText('Choisis une date et une heure à venir, à l’heure de Paris.')).toBeVisible();
+  await page.getByRole('button', { name: 'Demain', exact: true }).click();
+  await page.getByTestId('wizard-next').click();
+  await expect(page.getByRole('heading', { name: 'Qu’est-ce qui te ferait plaisir ?' })).toBeVisible();
 });
 
-test('automatic dinner results keep twelve venues with cuisine filters and review links', async ({ page }) => {
+test('cuisine and terrace filters chosen at creation drive the search, and the organizer can change them', async ({ page }) => {
   const cuisines: Cuisine[] = ['chinese', 'italian', 'french'];
-  await mockBackend(page, {
+  const backend = await mockBackend(page, {
     automatic: true,
-    recommendations: outing => Array.from({ length: 12 }, (_, i) => ({ venue: venue(i, { kind: 'dinner', cuisines: [cuisines[i % 3]!] }), maximum: 600 + i * 60, sum: 1200 + i * 60, spread: i * 30, journeys: outing.participants.map(person => ({ participantId: person.id, outbound: { departure: 0, arrival: 600, duration: 600, legs: [], night: false }, inbound: { departure: 0, arrival: 600, duration: 600, legs: [], night: false } })) })),
+    recommendations: outing => Array.from({ length: 12 }, (_, i) => ({ venue: venue(i, { kind: 'dinner', cuisines: [cuisines[i % 3]!], outdoorSeating: i < 6 }), maximum: 600 + i * 60, sum: 1200 + i * 60, spread: i * 30, journeys: outing.participants.map(person => ({ participantId: person.id, outbound: { departure: 0, arrival: 600, duration: 600, legs: [], night: false }, inbound: { departure: 0, arrival: 600, duration: 600, legs: [], night: false } })) })),
   });
-  await createOuting(page, 'Un resto');
-  await expect(page.getByText('Il ne manque qu’un ami.')).toBeVisible();
+  await createOuting(page, 'Un resto', ['Chinois']);
+  expect(backend.state.outing?.filters).toEqual({ cuisines: ['chinese'], outdoorSeating: false });
   await addFriend(page);
-  await expect(page.getByText('OpenStreetMap', { exact: true })).toHaveCount(12);
-  await expect(page.getByText('Le plus équilibré', { exact: true })).toHaveCount(1);
-  await page.getByRole('button', { name: 'Chinois', exact: true }).click();
   await expect(page.getByText('OpenStreetMap', { exact: true })).toHaveCount(4);
+  await expect(page.getByText('Le plus équilibré', { exact: true })).toHaveCount(1);
   await page.getByRole('button', { name: 'Tous les restos', exact: true }).click();
   await expect(page.getByText('OpenStreetMap', { exact: true })).toHaveCount(12);
-  await expect(page.getByRole('link', { name: /Consulter les avis Google/ })).toHaveCount(12);
+  await page.getByRole('button', { name: 'Avec terrasse', exact: true }).click();
+  await expect(page.getByText('OpenStreetMap', { exact: true })).toHaveCount(6);
+  expect(backend.state.outing?.filters).toEqual({ cuisines: [], outdoorSeating: true });
+  await expect(page.getByRole('link', { name: /Consulter les avis Google/ })).toHaveCount(6);
   await page.screenshot({ path: `test-results/results-${test.info().project.name}.png`, fullPage: true });
 });
 

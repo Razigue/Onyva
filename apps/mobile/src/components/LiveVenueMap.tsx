@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
-import { AppState, Text, View } from 'react-native';
+import { AppState, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { locationPayloadSchema, locationTopic } from '@onyva/shared';
 import type { LivePosition, Outing, Station, Venue } from '@onyva/shared';
 import { supabase } from '../lib/supabase';
 import VenueMap from './VenueMap';
-import { ui } from './ui';
+import { Body } from './ui';
 export default function LiveVenueMap(
   { outing, stations, venues }: { outing: Outing; stations: Station[]; venues: Venue[] },
 ) {
@@ -62,16 +62,16 @@ export default function LiveVenueMap(
     };
   }, [topic, outing.confirmedVenueId]));
   return (
-    <View style={{ gap: 8 }}>
+    <View className="gap-2">
       <VenueMap stations={stations} venues={venues} positions={positions} />
       {unavailable && (
-        <Text style={ui.body}>Le partage en direct est indisponible pour le moment.</Text>
+        <Body>Le partage en direct est indisponible pour le moment.</Body>
       )}
       {positions.map((position) => (
-        <Text key={position.participantId} style={ui.body}>
+        <Body key={position.participantId}>
           {outing.participants.find((p) => p.id === position.participantId)?.name}{' '}
           partage sa position.
-        </Text>
+        </Body>
       ))}
     </View>
   );

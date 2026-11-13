@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Text, View } from 'react-native';
-import { Button, Notice, Shell, ui } from '../src/components/ui';
+import { ActivityIndicator, View } from 'react-native';
+import { Body, Button, Notice, Shell } from '../src/components/ui';
 import { useStore } from '../src/lib/store';
 import { authErrorMessage } from '../src/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,6 +14,6 @@ export default function Auth() {
     if (failure || !userId || anonymous) return;
     void AsyncStorage.getItem('onyva:pending-invite').then(code => { router.replace(code ? { pathname: '/join', params: { code } } : '/account'); });
   }, [userId, anonymous, failure]);
-  if (failure) return <Shell narrow><View style={ui.section}><Notice warning>{authErrorMessage(failure)}</Notice><Button secondary onPress={() => router.replace('/account')}>Retour à mon compte</Button></View></Shell>;
-  return <Shell narrow><View style={ui.section}><ActivityIndicator /><Text style={ui.body}>On termine ta connexion…</Text><Button secondary onPress={() => router.replace('/account')}>Retour à mon compte</Button></View></Shell>;
+  if (failure) return <Shell narrow><View className="mb-8 gap-5"><Notice warning>{authErrorMessage(failure)}</Notice><Button secondary onPress={() => router.replace('/account')}>Retour à mon compte</Button></View></Shell>;
+  return <Shell narrow><View className="mb-8 gap-5"><ActivityIndicator /><Body>On termine ta connexion…</Body><Button secondary onPress={() => router.replace('/account')}>Retour à mon compte</Button></View></Shell>;
 }

@@ -8,10 +8,12 @@ Onyva est une application Expo iOS et Android qui cherche un lieu de rencontre �
 
 1. L’application parle à Supabase.
 2. Supabase fournit PostgreSQL, PostGIS, Auth anonyme avec Apple et Google facultatifs, Realtime, les Edge Functions et pg_cron.
-3. Les Edge Functions utilisent le calculateur Navitia de PRIM. La clé reste côté serveur. Aucun serveur de routage ni VM n’est nécessaire.
+3. Transition en cours : les trajets passent de PRIM/Navitia à un moteur maison alimenté par le GTFS IDFM (décision du 6 novembre 2026, voir `docs/engine.md`). Le moteur est un service Node sans état, appelé uniquement par l’Edge Function `recommend` avec un secret partagé. Il tourne sur un VPS OVHcloud VPS-2 à prix mensuel fixe (décision du 12 novembre 2026, voir l’exception ci-dessous). Le moteur est branché dans `recommend` derrière `TRANSIT_PROVIDER=engine` ; PRIM reste le fournisseur actif tant que la VM n’est pas déployée.
 4. Une tâche GitHub Actions hebdomadaire importe les lieux depuis l’extrait régional OpenStreetMap, sans Overpass.
 
 Tout doit rester gratuit au départ. Ne jamais ajouter un service payant, une facturation à l’usage ou un dépassement automatique sans accord explicite. Le dépassement d’un quota bloque le service concerné avec un message clair. La gratuité n’est pas une promesse de capacité illimitée.
+
+Exception acceptée le 12 novembre 2026 : le VPS du moteur (OVHcloud VPS-2, prix mensuel fixe, sans option payante ni facturation au trafic). Oracle Cloud Always Free a refusé l’inscription. Toute autre dépense reste soumise à accord explicite.
 
 ## Structure
 
@@ -21,26 +23,29 @@ Monorepo pnpm workspaces, TypeScript strict, sans Turborepo.
 apps/
   mobile/                  Expo Router, NativeWind, MapLibre
   invite/                  Page statique, invitations et liens vers les boutiques
+  engine/                  Service HTTP du moteur, sans état, fils parallèles, Docker multi-architecture
 packages/
   shared/                  Schémas Zod, types, contrats et types Supabase générés
   fairness/                Règles pures : minimax, présélection et validation des retours
+  transit-engine/          Compilation GTFS, instantané binaire, RAPTOR, sans réseau ni base
 supabase/
   migrations/              Migrations SQL versionnées, source de vérité de la base
   functions/
-    recommend/             Orchestration PRIM et résultat progressif
+    recommend/             Orchestration PRIM ou moteur (TRANSIT_PROVIDER) et résultat progressif
     location/              Réception HTTP des positions et relais Realtime HTTP
     dispatch-notifications/
     delete-account/
     _shared/               Adaptateurs et orchestration testables
 scripts/
   venues/                  Extraction OSM régionale et import hebdomadaire
-  import-stations.ts       Catalogue de stations PRIM
+  import-stations.ts       Catalogue de stations PRIM, remplacé par scripts/engine/ à terme
+  engine/                  build-network, bench, bench-http, record-references, import-stations, refresh-snapshot.sh
   generate-db-types.mjs     Génération des types depuis Supabase
 tests/
   database/                RLS, quotas, concurrence et PostGIS
 ```
 
-L’ancien moteur maison est documenté comme plan B dans `docs/plan-b.md`. Il ne fait pas partie du runtime ni des dépendances actives.
+Le moteur maison est documenté dans `docs/engine.md`, phase par phase. `docs/plan-b.md` est une note d’historique.
 
 ## Commandes
 
@@ -48,6 +53,10 @@ L’ancien moteur maison est documenté comme plan B dans `docs/plan-b.md`. Il n
 pnpm install
 pnpm dev                         # aperçu local de l’application
 pnpm dev:all                     # application et invitations en parallèle
+pnpm dev:local                   # pile locale : moteur, fonctions et application sur Supabase local, sans PRIM
+pnpm test:local                  # parcours de bout en bout sur la pile locale
+pnpm local:venues                # lieux OSM de la base locale
+pnpm local:stations              # lignes des stations locales depuis l’instantané
 pnpm --filter mobile start       # build de développement requis pour le GPS en arrière-plan
 pnpm supabase:start
 pnpm supabase:functions
@@ -64,6 +73,13 @@ pnpm test:database                # PostgreSQL/PostGIS isolé dans le conteneur 
 pnpm test:e2e
 # Test distant explicite avec comptes temporaires et jusqu’à 20 appels gratuits :
 ONYVA_LIVE_TEST_CONFIRMED=true pnpm test:manual
+# Moteur maison, GTFS décompressé dans data/gtfs-idfm/raw :
+pnpm engine:build-network         # GTFS IDFM vers instantané binaire dans data/engine
+pnpm engine:bench                 # mémoire et latences sur le GTFS réel
+pnpm engine:dev                   # service moteur local, ENGINE_SECRET requis
+pnpm engine:bench-http            # latences HTTP d’un service lancé
+pnpm engine:record-references     # 20 captures PRIM de référence, --dry-run sans appel
+pnpm engine:import-stations       # catalogue depuis l’instantané, simulation sans --apply
 ```
 
 Avant de terminer : `pnpm lint`, `pnpm typecheck` et `pnpm test` doivent passer. Exécuter aussi les tests SQL si les migrations ou les règles de sécurité changent. Ne jamais modifier une migration déjà appliquée pour faire évoluer le schéma. Ajouter une migration, puis régénérer les types. Ne pas réintroduire Drizzle.
@@ -73,7 +89,7 @@ Avant de terminer : `pnpm lint`, `pnpm typecheck` et `pnpm test` doivent passer.
 - Tout échange entre l’application, les fonctions, PRIM et la base possède un schéma Zod dans `packages/shared`. Valider les entrées. Aucun `any`.
 - Les règles de choix vivent dans `packages/fairness`, sans réseau ni base. Les adaptateurs PRIM restent hors de ce package.
 - L’application n’appelle jamais PRIM directement. Une Edge Function vérifie la session et l’appartenance à la sortie.
-- Une isochrone tabulaire par départ distinct et heure de rendez-vous alimente la présélection. Le classement minimise le trajet maximum, puis la somme, puis l’écart.
+- Une isochrone tabulaire par départ distinct et heure de rendez-vous alimente la présélection. Le classement minimise le trajet maximum, puis la somme, puis l’écart. Avec le moteur, ce classement est fait dans le moteur (`POST /v1/rank`) sur les seules stations qui ont un lieu ouvert, et la fonction ne reçoit que les 20 meilleures stations. Voir la phase 5 de `docs/engine.md`.
 - Les allers à l’heure d’arrivée et les retours après la fin sont vérifiés pour les trois meilleurs lieux présélectionnés. Aucun lieu non vérifié n’est confirmable. Ne pas présenter un polygone isochrone comme un temps exact ni promettre un optimum global non démontré.
 - Cache court en base, lié à la sortie et supprimé en cascade. Clés distinctes selon départ, destination, date, direction et fraîcheur. Les temps déjà calculés sont réutilisés tant qu’ils sont frais. Un nouvel arrivant ne relance pas les isochrones des autres.
 - Les verrous de calcul et le contrôle de révision empêchent les appels concurrents identiques et les résultats obsolètes. Le compteur PRIM est partagé entre les fonctions, pas seulement en mémoire.
@@ -119,7 +135,8 @@ Vitest couvre les règles pures, les réponses PRIM enregistrées quand une clé
 
 ## Données et déploiement
 
-- PRIM Navitia : itinéraires, isochrones tabulaires et perturbations, cache court, clé en variables serveur. Quota gratuit à confirmer dans le compte PRIM avant activation.
+- GTFS IDFM : horaires théoriques sur environ 30 jours, Licence Mobilités, attribution Île-de-France Mobilités. Source, mesures et contrat du moteur dans `docs/engine.md`.
+- PRIM Navitia, en transition : itinéraires, isochrones tabulaires et perturbations, cache court, clé en variables serveur. Retiré après validation du moteur en production.
 - OpenStreetMap : extrait régional PBF téléchargé une fois par semaine depuis Geofabrik. Une extraction locale des bars, restaurants et cafés conserve horaires et cuisines documentés. Aucune requête Overpass ni appel par établissement.
 - PostGIS cherche les lieux à cinq minutes de marche estimée d’une station ; l’itinéraire détaillé valide la marche finale. Horaires inconnus exclus. Attribution OSM/ODbL conservée.
 - Aucun secret ni position dans le code ou les logs. Variables documentées dans `.env.example`.

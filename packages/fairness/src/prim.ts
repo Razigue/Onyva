@@ -71,36 +71,46 @@ export function rankStations(
   }).sort((a, b) => compareScores(a, b) || a.stationId.localeCompare(b.stationId));
 }
 
+/**
+ * Up to `count` venues on distinct stations, in the station minimax order, so that the group compares real alternatives.
+ * The closest venue of the best station always comes first. For dinner, a venue with a new cuisine is preferred at each station.
+ * When fewer stations have an eligible venue, the remaining places go to other venues of the best stations.
+ */
 export function shortlistVenues(
   stations: StationScore[],
   venues: Venue[],
   startsAt: number,
   endsAt: number,
   kind: Venue['kind'],
+  count = 3,
 ): Venue[] {
-  // The first station with eligible venues is selected by the station minimax order.
-  for (const station of stations) {
-    const choices = venues.filter((venue) =>
-      venue.stationId === station.stationId && venue.kind === kind && venue.walkSeconds <= 300 &&
-      venue.openIntervals.some((interval) => interval.start <= startsAt && interval.end >= endsAt)
-    ).sort((a, b) => a.walkSeconds - b.walkSeconds || a.id.localeCompare(b.id));
-    if (choices.length) {
-      const selected = [choices[0]!];
-      const cuisines = new Set(selected[0]!.cuisines);
-      for (const choice of choices.slice(1)) {
-        if (selected.length >= 3) break;
-        if (kind === 'dinner' && choice.cuisines?.some((cuisine) => !cuisines.has(cuisine))) {
-          selected.push(choice);
-          for (const cuisine of choice.cuisines) cuisines.add(cuisine);
-        }
-      }
-      for (const choice of choices) {
-        if (selected.length < 3 && !selected.includes(choice)) selected.push(choice);
-      }
-      return selected;
-    }
+  const byStation = new Map<string, Venue[]>();
+  for (const venue of venues) {
+    if (
+      venue.kind !== kind || venue.walkSeconds > 300 ||
+      !venue.openIntervals.some((interval) => interval.start <= startsAt && interval.end >= endsAt)
+    ) continue;
+    byStation.set(venue.stationId, [...byStation.get(venue.stationId) ?? [], venue]);
   }
-  return [];
+  const ordered = [...new Set(stations.map((station) => station.stationId))]
+    .flatMap((id) => byStation.has(id) ? [byStation.get(id)!.sort((a, b) => a.walkSeconds - b.walkSeconds || a.id.localeCompare(b.id))] : []);
+  const selected: Venue[] = [], cuisines = new Set<string>();
+  const pick = (list: Venue[]) => {
+    const free = list.filter((venue) => !selected.includes(venue));
+    const choice = kind === 'dinner' && selected.length
+      ? free.find((venue) => venue.cuisines?.some((cuisine) => !cuisines.has(cuisine))) ?? free[0]
+      : free[0];
+    if (!choice) return false;
+    selected.push(choice);
+    for (const cuisine of choice.cuisines ?? []) cuisines.add(cuisine);
+    return true;
+  };
+  for (const list of ordered) {
+    if (selected.length >= count) break;
+    pick(list);
+  }
+  for (const list of ordered) while (selected.length < count && pick(list));
+  return selected;
 }
 
 /** Full point-to-point verification. Missing sections, prohibited modes and gaps fail closed. */
